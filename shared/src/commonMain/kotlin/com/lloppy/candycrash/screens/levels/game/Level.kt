@@ -42,7 +42,7 @@ object Levels {
         val mask = shapeFor(i)
         val playable = mask.sumOf { row -> row.count { it } }
         val moves = (25 - (i - 1)).coerceAtLeast(12)
-        val colors = (4 + (i - 1) / 3).coerceAtMost(6)
+        val colors = (4 + (i - 1) / 3).coerceAtMost(5) // максимум 5 цветов (5 картинок)
         // пороги звёзд завязаны на число ходов и размер поля (ожидаемый счёт за ход).
         // Играем до конца ходов, поэтому 3 звезды — сложно, но достижимо.
         val pf = playable.toDouble() / (N * N)
@@ -74,12 +74,16 @@ object Levels {
     /** Цель уровня: микс «набрать очки» и «собрать N шариков цвета». Счётчики
      *  подобраны под число ходов уровня (легко тюнится). */
     private fun objectiveFor(level: Int): Objective = when (level) {
-        3 -> Objective.Collect(linkedMapOf(GemColor.Red to 22))                       // 23 ходов
-        5 -> Objective.Collect(linkedMapOf(GemColor.Blue to 16, GemColor.Green to 16)) // 21 ход
-        7 -> Objective.Collect(linkedMapOf(GemColor.Yellow to 24))                    // 19 ходов
-        8 -> Objective.Collect(linkedMapOf(GemColor.Red to 16, GemColor.Purple to 16)) // 18 ходов
-        10 -> Objective.Collect(linkedMapOf(GemColor.Green to 12, GemColor.Orange to 12, GemColor.Blue to 12)) // 16 ходов
-        else -> Objective.Score // 1,2,4,6,9
+        1 -> Objective.Collect(linkedMapOf(GemColor.Red to 14))                        // 4 цвета, 25 ходов
+        2 -> Objective.Collect(linkedMapOf(GemColor.Blue to 16))                       // 4 цвета, 24 хода
+        3 -> Objective.Collect(linkedMapOf(GemColor.Red to 20))                        // 4 цвета, 23 хода
+        4 -> Objective.Collect(linkedMapOf(GemColor.Green to 16, GemColor.Yellow to 16)) // 5 цветов, 22 хода
+        5 -> Objective.Collect(linkedMapOf(GemColor.Blue to 3)) // TEMP для теста салюта
+        6 -> Objective.Collect(linkedMapOf(GemColor.Purple to 18))                     // 5 цветов, 20 ходов
+        7 -> Objective.Collect(linkedMapOf(GemColor.Yellow to 22))                     // 6 цветов, 19 ходов
+        8 -> Objective.Collect(linkedMapOf(GemColor.Red to 16, GemColor.Purple to 16)) // 6 цветов, 18 ходов
+        9 -> Objective.Collect(linkedMapOf(GemColor.Yellow to 16, GemColor.Purple to 16)) // 6 цветов, 17 ходов
+        else -> Objective.Collect(linkedMapOf(GemColor.Green to 12, GemColor.Blue to 12, GemColor.Yellow to 12)) // 10: 16 ходов
     }
 
     /** Возвращает форму поля для уровня (предикат играбельности на сетке N×N). */

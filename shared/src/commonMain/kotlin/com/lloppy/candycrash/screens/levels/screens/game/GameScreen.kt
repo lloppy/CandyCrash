@@ -67,9 +67,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.lloppy.candycrash.screens.levels.game.Gem
 import com.lloppy.candycrash.screens.levels.game.GemColor
 import com.lloppy.candycrash.screens.levels.ui.ConfettiOverlay
+import com.lloppy.candycrash.screens.levels.ui.GameTitle
+import com.lloppy.candycrash.screens.levels.ui.GlossyCard
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -156,11 +160,6 @@ fun GameScreen(
                     onSwipe = viewModel::applyMove,
                 )
             }
-        }
-
-        // победный салют
-        if (state.status == GameStatus.Won) {
-            ConfettiOverlay(Modifier.fillMaxSize())
         }
     }
 
@@ -690,32 +689,47 @@ private fun ResultDialog(
     onNext: () -> Unit,
     onExit: () -> Unit,
 ) {
-    _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GameDialog(onDismiss = {}) {
-        _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GameTitle(
-            text = if (won) "Уровень пройден!" else "Не получилось",
-            fontSize = 26.sp
-        )
-        Spacer(Modifier.height(14.dp))
-        if (won) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                repeat(3) { i -> ResultStar(earned = i < stars, index = i) }
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // салют — в окне диалога, поверх затемнения, позади карточки
+            if (won) ConfettiOverlay(Modifier.fillMaxSize())
+
+            GlossyCard(Modifier.fillMaxWidth(0.82f), cornerRadius = 26.dp) {
+                Column(
+                    Modifier.fillMaxWidth().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    GameTitle(
+                        text = if (won) "Уровень пройден!" else "Не получилось",
+                        fontSize = 26.sp,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    if (won) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            repeat(3) { i -> ResultStar(earned = i < stars, index = i) }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    Text(
+                        text = "Очки: $score",
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    if (won && hasNext) {
+                        Button(onClick = onNext, modifier = Modifier.fillMaxWidth()) { Text("Дальше") }
+                        Spacer(Modifier.height(6.dp))
+                        TextButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("Ещё раз") }
+                    } else {
+                        Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("Ещё раз") }
+                        Spacer(Modifier.height(6.dp))
+                        TextButton(onClick = onExit, modifier = Modifier.fillMaxWidth()) { Text("Выход") }
+                    }
+                }
             }
-            Spacer(Modifier.height(12.dp))
-        }
-        Text(
-            text = "Очки: $score",
-            fontSize = 18.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(20.dp))
-        if (won && hasNext) {
-            Button(onClick = onNext, modifier = Modifier.fillMaxWidth()) { Text("Дальше") }
-            Spacer(Modifier.height(6.dp))
-            TextButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("Ещё раз") }
-        } else {
-            Button(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("Ещё раз") }
-            Spacer(Modifier.height(6.dp))
-            TextButton(onClick = onExit, modifier = Modifier.fillMaxWidth()) { Text("Выход") }
         }
     }
 }
