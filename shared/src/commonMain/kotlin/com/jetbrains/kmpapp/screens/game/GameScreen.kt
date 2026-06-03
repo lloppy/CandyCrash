@@ -76,6 +76,7 @@ import com.jetbrains.kmpapp.game.SettingsRepository
 import com.jetbrains.kmpapp.theme.LocalIsDarkTheme
 import com.jetbrains.kmpapp.ui.GameBackground
 import com.jetbrains.kmpapp.ui.GameDialog
+import com.jetbrains.kmpapp.ui.GameTitle
 import com.jetbrains.kmpapp.ui.GemVisual
 import com.jetbrains.kmpapp.ui.GlossyCard
 import com.jetbrains.kmpapp.ui.RoundIconButton
@@ -126,14 +127,9 @@ fun GameScreen(
                 RoundIconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                 }
-                Text(
-                    text = "Уровень $levelId",
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    GameTitle(text = "Уровень $levelId", fontSize = 24.sp)
+                }
                 RoundIconButton(onClick = { showPause = true }) {
                     Icon(Icons.Filled.Settings, contentDescription = "Меню")
                 }
@@ -199,12 +195,7 @@ private fun PauseDialog(
     onExit: () -> Unit,
 ) {
     GameDialog(onDismiss = onResume) {
-        Text(
-            text = "Пауза",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        GameTitle(text = "Пауза", fontSize = 28.sp)
         Spacer(Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -680,12 +671,7 @@ private fun ResultDialog(
     onExit: () -> Unit,
 ) {
     GameDialog(onDismiss = {}) {
-        Text(
-            text = if (won) "Уровень пройден!" else "Не получилось",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        GameTitle(text = if (won) "Уровень пройден!" else "Не получилось", fontSize = 26.sp)
         Spacer(Modifier.height(14.dp))
         if (won) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

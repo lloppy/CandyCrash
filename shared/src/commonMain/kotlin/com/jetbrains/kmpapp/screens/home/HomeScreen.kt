@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.jetbrains.kmpapp.game.Gem
 import com.jetbrains.kmpapp.game.GemColor
 import com.jetbrains.kmpapp.ui.GameBackground
+import com.jetbrains.kmpapp.ui.GameTitle
 import com.jetbrains.kmpapp.ui.GemVisual
 import kotlin.math.PI
 import kotlin.math.cos
@@ -85,12 +86,7 @@ fun HomeScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            Text(
-                text = "Три в ряд",
-                fontSize = 44.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            GameTitle(text = "Три в ряд", fontSize = 46.sp)
 
             Spacer(Modifier.height(48.dp))
 

@@ -66,6 +66,7 @@ import com.jetbrains.kmpapp.game.Levels
 import com.jetbrains.kmpapp.game.Objective
 import com.jetbrains.kmpapp.ui.GameBackground
 import com.jetbrains.kmpapp.ui.GameDialog
+import com.jetbrains.kmpapp.ui.GameTitle
 import com.jetbrains.kmpapp.ui.GemVisual
 import com.jetbrains.kmpapp.ui.Gold
 import com.jetbrains.kmpapp.ui.GlossyCard
@@ -116,15 +117,7 @@ fun LevelsScreen(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    GlossyCard(cornerRadius = 18.dp) {
-                        Text(
-                            text = "Карта уровней",
-                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
+                    GameTitle(text = "Карта уровней", fontSize = 26.sp)
                 }
                 Spacer(Modifier.size(46.dp))
             }
@@ -282,12 +275,7 @@ private fun LevelInfoDialog(
     onDismiss: () -> Unit,
 ) {
     GameDialog(onDismiss = onDismiss) {
-        Text(
-            text = "Уровень ${level.id}",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        GameTitle(text = "Уровень ${level.id}", fontSize = 28.sp)
         Spacer(Modifier.height(8.dp))
         // лучший результат
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -59,9 +59,9 @@ object Levels {
             cols = N,
             colors = colors,
             moves = moves,
-            star1 = roundTo((moves * 30 * pf).toInt(), 50).coerceAtLeast(150),
-            star2 = roundTo((moves * 46 * pf).toInt(), 50).coerceAtLeast(250),
-            star3 = roundTo((moves * 64 * pf).toInt(), 50).coerceAtLeast(350),
+            star1 = roundTo((moves * 26 * pf).toInt(), 50).coerceAtLeast(150),
+            star2 = roundTo((moves * 42 * pf).toInt(), 50).coerceAtLeast(250),
+            star3 = roundTo((moves * 58 * pf).toInt(), 50).coerceAtLeast(350),
             mask = mask,
             objective = objective,
         )
@@ -71,13 +71,14 @@ object Levels {
 
     private fun roundTo(value: Int, step: Int) = ((value + step / 2) / step) * step
 
-    /** Цель уровня: микс «набрать очки» и «собрать N шариков цвета». */
+    /** Цель уровня: микс «набрать очки» и «собрать N шариков цвета». Счётчики
+     *  подобраны под число ходов уровня (легко тюнится). */
     private fun objectiveFor(level: Int): Objective = when (level) {
-        3 -> Objective.Collect(linkedMapOf(GemColor.Red to 20))
-        5 -> Objective.Collect(linkedMapOf(GemColor.Blue to 22, GemColor.Green to 22))
-        7 -> Objective.Collect(linkedMapOf(GemColor.Yellow to 28))
-        8 -> Objective.Collect(linkedMapOf(GemColor.Red to 22, GemColor.Purple to 22))
-        10 -> Objective.Collect(linkedMapOf(GemColor.Green to 26, GemColor.Orange to 26, GemColor.Blue to 26))
+        3 -> Objective.Collect(linkedMapOf(GemColor.Red to 22))                       // 23 ходов
+        5 -> Objective.Collect(linkedMapOf(GemColor.Blue to 16, GemColor.Green to 16)) // 21 ход
+        7 -> Objective.Collect(linkedMapOf(GemColor.Yellow to 24))                    // 19 ходов
+        8 -> Objective.Collect(linkedMapOf(GemColor.Red to 16, GemColor.Purple to 16)) // 18 ходов
+        10 -> Objective.Collect(linkedMapOf(GemColor.Green to 12, GemColor.Orange to 12, GemColor.Blue to 12)) // 16 ходов
         else -> Objective.Score // 1,2,4,6,9
     }
 

@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,14 +21,59 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.jetbrains.kmpapp.theme.LocalIsDarkTheme
 import com.jetbrains.kmpapp.theme.StarryBackground
 
 /** Золотой акцент для звёзд (общий по всему приложению). */
 val Gold = Color(0xFFFFC107)
+
+/**
+ * «Наклеечный» заголовок в стиле casual-игр: жирный текст с тёмной обводкой
+ * и золотисто-кремовым градиентом. Хорошо читается на любом фоне (обе темы).
+ */
+@Composable
+fun GameTitle(
+    text: String,
+    modifier: Modifier = Modifier,
+    fontSize: TextUnit = 28.sp,
+    fillTop: Color = Color(0xFFFFF6C0),
+    fillBottom: Color = Color(0xFFFFC107),
+    outlineColor: Color = Color(0xFF4A2A7A),
+) {
+    val outlinePx = with(LocalDensity.current) { fontSize.toPx() } * 0.16f
+    val base = TextStyle(fontSize = fontSize, fontWeight = FontWeight.ExtraBold)
+    Box(modifier, contentAlignment = Alignment.Center) {
+        // мягкая тень
+        Text(
+            text = text,
+            style = base.copy(color = Color.Black.copy(alpha = 0.25f)),
+            modifier = Modifier.offset(y = 2.dp),
+        )
+        // обводка
+        Text(
+            text = text,
+            style = base.copy(
+                color = outlineColor,
+                drawStyle = Stroke(width = outlinePx, join = StrokeJoin.Round),
+            ),
+        )
+        // заливка-градиент
+        Text(
+            text = text,
+            style = base.copy(brush = Brush.verticalGradient(listOf(fillTop, fillBottom))),
+        )
+    }
+}
 
 /** Фон приложения: космический градиент + звёзды в тёмной теме, конфетный — в светлой. */
 @Composable
