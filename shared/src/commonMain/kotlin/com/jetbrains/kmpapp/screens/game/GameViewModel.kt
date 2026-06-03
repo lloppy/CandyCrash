@@ -88,56 +88,28 @@ class GameViewModel(
     }
 
     /**
-     * Выполняет обмен [a] <-> [b]. UI анимирует перемещение шариков по смене
-     * состояния поля: сначала показываем обмен, затем — каскад или "отскок".
-     * Используется тапом и свайпом.
+     * Выполняет обмен [a] <-> [b]. Без анимации: поле сразу переходит в итоговое
+     * состояние (совпадения убраны, падение и досыпка применены). Используется
+     * тапом и свайпом.
      */
     fun applyMove(a: Pos, b: Pos) {
         val state = _uiState.value
-        if (state.busy || state.status != GameStatus.Playing) return
+        if (state.status != GameStatus.Playing) return
         if (!Match3Engine.areAdjacent(a, b)) return
 
         val result = Match3Engine.tryMove(solidBoard, a, b, level, random)
-        viewModelScope.launch {
-            // показываем обмен (шарики скользят навстречу)
-            _uiState.update {
-                it.copy(board = Match3Engine.swapped(solidBoard, a, b), selected = null, busy = true)
-            }
-            delay(SWAP_MS)
-
-            if (result == null) {
-                // недопустимый ход — возвращаем шарики на место (отскок)
-                _uiState.update { it.copy(board = solidBoard) }
-                delay(SWAP_MS)
-                _uiState.update { it.copy(busy = false) }
-                return@launch
-            }
-            runCascade(result)
-        }
-    }
-
-    private suspend fun runCascade(result: MoveResult) {
-        // Кадры идут парами: [с дырами, после падения]. Показываем только осевшие
-        // (нечётные), чтобы очистка и падение шли одним плавным движением.
-        // Задержка = реальному времени падения (макс. расстояние × скорость) + осадка.
-        result.frames.forEachIndexed { i, frame ->
-            if (i % 2 == 1) {
-                val cells = maxFallCells(_uiState.value.board, frame)
-                _uiState.update { it.copy(board = frame) }
-                delay(moveDelay(cells))
-            }
+        if (result == null) {
+            // недопустимый ход — просто снимаем выбор
+            _uiState.update { it.copy(selected = null) }
+            return
         }
 
-        // на случай "мёртвого" поля — перемешиваем
         var board = result.finalBoard
-        if (!Match3Engine.hasAvailableMove(board)) {
-            board = reshuffle(board)
-            _uiState.update { it.copy(board = board) }
-        }
+        if (!Match3Engine.hasAvailableMove(board)) board = reshuffle(board)
         solidBoard = board
 
-        val newScore = _uiState.value.score + result.gainedScore
-        val newMoves = _uiState.value.movesLeft - 1
+        val newScore = state.score + result.gainedScore
+        val newMoves = state.movesLeft - 1
         // уровень идёт до конца ходов; звёзды считаются по итоговому счёту
         val newStatus = when {
             newMoves > 0 -> GameStatus.Playing
@@ -153,7 +125,7 @@ class GameViewModel(
                 movesLeft = newMoves,
                 status = newStatus,
                 earnedStars = stars,
-                busy = false,
+                selected = null,
             )
         }
         if (newStatus == GameStatus.Won) progress.onLevelCompleted(level.id, stars)
