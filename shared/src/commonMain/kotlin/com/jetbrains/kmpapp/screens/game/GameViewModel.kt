@@ -155,37 +155,4 @@ class GameViewModel(
         score >= level.star2 -> 2
         else -> 1
     }
-
-    /** Максимальное расстояние падения (в клетках) между двумя кадрами поля. */
-    private fun maxFallCells(prev: List<List<Gem?>>, cur: List<List<Gem?>>): Int {
-        val prevRow = HashMap<Long, Int>()
-        for (r in prev.indices) for (c in prev[r].indices) prev[r][c]?.let { prevRow[it.id] = r }
-        var maxd = 0
-        for (c in 0 until level.cols) {
-            var newInCol = 0
-            for (r in 0 until level.rows) {
-                val g = cur[r][c] ?: continue
-                val pr = prevRow[g.id]
-                if (pr != null) {
-                    if (r - pr > maxd) maxd = r - pr
-                } else {
-                    newInCol++ // новый шарик падает сверху (стопкой высотой newInCol)
-                }
-            }
-            if (newInCol > maxd) maxd = newInCol
-        }
-        return maxd
-    }
-
-    private fun moveDelay(cells: Int): Long =
-        (cells * MS_PER_CELL).coerceIn(MIN_MOVE_MS, MAX_MOVE_MS) + SETTLE_MS
-
-    companion object {
-        // Тайминги синхронны с GameScreen (постоянная скорость падения).
-        private const val SWAP_MS = 150L
-        private const val MS_PER_CELL = 55L
-        private const val MIN_MOVE_MS = 120L
-        private const val MAX_MOVE_MS = 480L
-        private const val SETTLE_MS = 60L
-    }
 }
