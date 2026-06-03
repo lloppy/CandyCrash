@@ -14,11 +14,11 @@ dependencies {
 }
 
 android {
-    namespace = "com.jetbrains.kmpapp"
+    namespace = "com.lloppy.candycrash"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.jetbrains.kmpapp"
+        applicationId = "com.lloppy.candycrash"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
