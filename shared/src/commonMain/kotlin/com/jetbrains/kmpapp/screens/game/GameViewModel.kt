@@ -4,10 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jetbrains.kmpapp.game.Gem
 import com.jetbrains.kmpapp.game.GameProgressRepository
+import com.jetbrains.kmpapp.game.GemColor
 import com.jetbrains.kmpapp.game.Level
 import com.jetbrains.kmpapp.game.Levels
 import com.jetbrains.kmpapp.game.Match3Engine
 import com.jetbrains.kmpapp.game.MoveResult
+import com.jetbrains.kmpapp.game.Objective
+import com.jetbrains.kmpapp.game.isComplete
 import com.jetbrains.kmpapp.game.Pos
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +38,10 @@ data class GameUiState(
     val busy: Boolean = false,
     /** Шарики, которые сейчас лопаются (для анимации «поп»). */
     val clearing: List<ClearFx> = emptyList(),
+    /** Цель уровня. */
+    val objective: Objective = Objective.Score,
+    /** Сколько шариков каждого цвета уже собрано (для цели "собрать"). */
+    val collected: Map<GemColor, Int> = emptyMap(),
 )
 
 class GameViewModel(
@@ -52,6 +59,9 @@ class GameViewModel(
     val star1: Int = level.star1
     val star2: Int = level.star2
     val star3: Int = level.star3
+
+    /** Цель уровня — для UI. */
+    val objective: Objective = level.objective
 
     /** Текущее "устойчивое" поле между ходами (null = пустая/заблокированная клетка). */
     private var solidBoard: List<List<Gem?>> = emptyList()
@@ -75,6 +85,8 @@ class GameViewModel(
             movesLeft = level.moves,
             target = level.passScore,
             status = GameStatus.Playing,
+            objective = level.objective,
+            collected = emptyMap(),
         )
     }
 
@@ -156,10 +168,18 @@ class GameViewModel(
 
         val newScore = _uiState.value.score + result.gainedScore
         val newMoves = _uiState.value.movesLeft - 1
-        val newStatus = when {
-            newMoves > 0 -> GameStatus.Playing
-            newScore >= level.star1 -> GameStatus.Won
-            else -> GameStatus.Lost
+        val newCollected = mergeCounts(_uiState.value.collected, result.clearedByColor)
+        val objectiveMet = level.objective.isComplete(newScore, level.star1, newCollected)
+
+        // Score: играем до конца ходов. Collect: победа сразу при выполнении цели.
+        val newStatus = when (level.objective) {
+            Objective.Score ->
+                if (newMoves > 0) GameStatus.Playing
+                else if (objectiveMet) GameStatus.Won else GameStatus.Lost
+            is Objective.Collect ->
+                if (objectiveMet) GameStatus.Won
+                else if (newMoves > 0) GameStatus.Playing
+                else GameStatus.Lost
         }
         val stars = if (newStatus == GameStatus.Won) starsFor(newScore) else 0
 
@@ -172,9 +192,17 @@ class GameViewModel(
                 earnedStars = stars,
                 busy = false,
                 clearing = emptyList(),
+                collected = newCollected,
             )
         }
         if (newStatus == GameStatus.Won) progress.onLevelCompleted(level.id, stars)
+    }
+
+    private fun mergeCounts(a: Map<GemColor, Int>, b: Map<GemColor, Int>): Map<GemColor, Int> {
+        if (b.isEmpty()) return a
+        val out = HashMap(a)
+        for ((k, v) in b) out[k] = (out[k] ?: 0) + v
+        return out
     }
 
     /** Макс. расстояние падения (в клетках) между двумя кадрами. */

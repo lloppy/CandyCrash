@@ -1,7 +1,9 @@
 package com.jetbrains.kmpapp.screens.game
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
@@ -65,7 +68,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jetbrains.kmpapp.game.Gem
+import com.jetbrains.kmpapp.game.GemColor
 import com.jetbrains.kmpapp.game.Levels
+import com.jetbrains.kmpapp.game.Objective
 import com.jetbrains.kmpapp.game.Pos
 import com.jetbrains.kmpapp.game.SettingsRepository
 import com.jetbrains.kmpapp.theme.LocalIsDarkTheme
@@ -139,6 +144,8 @@ fun GameScreen(
             StatsPanel(
                 score = state.score,
                 movesLeft = state.movesLeft,
+                objective = state.objective,
+                collected = state.collected,
                 star1 = viewModel.star1,
                 star2 = viewModel.star2,
                 star3 = viewModel.star3,
@@ -225,20 +232,22 @@ private fun PauseDialog(
 // ---------------------------------------------------------------------
 
 @Composable
-private fun StatsPanel(score: Int, movesLeft: Int, star1: Int, star2: Int, star3: Int) {
+private fun StatsPanel(
+    score: Int,
+    movesLeft: Int,
+    objective: Objective,
+    collected: Map<GemColor, Int>,
+    star1: Int,
+    star2: Int,
+    star3: Int,
+) {
     GlossyCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                StatPill(
-                    label = "ОЧКИ",
-                    value = score.toString(),
-                    container = MaterialTheme.colorScheme.primaryContainer,
-                    onContainer = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.weight(1f),
-                )
                 StatPill(
                     label = "ХОДЫ",
                     value = movesLeft.toString(),
@@ -246,9 +255,60 @@ private fun StatsPanel(score: Int, movesLeft: Int, star1: Int, star2: Int, star3
                     onContainer = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.weight(1f),
                 )
+                when (objective) {
+                    Objective.Score -> StatPill(
+                        label = "ОЧКИ",
+                        value = score.toString(),
+                        container = MaterialTheme.colorScheme.primaryContainer,
+                        onContainer = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.weight(1f),
+                    )
+                    is Objective.Collect -> Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        for ((color, need) in objective.targets) {
+                            val remaining = (need - (collected[color] ?: 0)).coerceAtLeast(0)
+                            CollectChip(color = color, remaining = remaining)
+                        }
+                    }
+                }
             }
+            // звёздный прогресс по очкам — показываем всегда (звёзды по очкам)
             Spacer(Modifier.height(14.dp))
             StarProgressBar(score = score, star1 = star1, star2 = star2, star3 = star3)
+        }
+    }
+}
+
+/** Чип цели «собрать»: иконка цвета (под тему) + остаток. */
+@Composable
+private fun CollectChip(color: GemColor, remaining: Int) {
+    val done = remaining == 0
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        GemVisual(gem = Gem(color), modifier = Modifier.size(26.dp))
+        if (done) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = null,
+                tint = Color(0xFF4CAF50),
+                modifier = Modifier.size(20.dp),
+            )
+        } else {
+            Text(
+                text = remaining.toString(),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }
@@ -628,15 +688,8 @@ private fun ResultDialog(
         )
         Spacer(Modifier.height(14.dp))
         if (won) {
-            Row {
-                repeat(3) { i ->
-                    Icon(
-                        imageVector = Icons.Filled.Star,
-                        contentDescription = null,
-                        tint = if (i < stars) Gold else MaterialTheme.colorScheme.outlineVariant,
-                        modifier = Modifier.size(44.dp),
-                    )
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                repeat(3) { i -> ResultStar(earned = i < stars, index = i) }
             }
             Spacer(Modifier.height(12.dp))
         }
@@ -656,4 +709,23 @@ private fun ResultDialog(
             TextButton(onClick = onExit, modifier = Modifier.fillMaxWidth()) { Text("Выход") }
         }
     }
+}
+
+/** Звезда результата: появляется с задержкой и лёгким «отскоком». */
+@Composable
+private fun ResultStar(earned: Boolean, index: Int) {
+    val scale = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(index * 160L)
+        scale.animateTo(
+            1f,
+            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        )
+    }
+    Icon(
+        imageVector = Icons.Filled.Star,
+        contentDescription = null,
+        tint = if (earned) Gold else MaterialTheme.colorScheme.outlineVariant,
+        modifier = Modifier.size(48.dp).scale(if (earned) scale.value else 1f),
+    )
 }

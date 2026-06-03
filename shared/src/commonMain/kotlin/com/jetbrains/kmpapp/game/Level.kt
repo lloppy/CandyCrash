@@ -21,6 +21,8 @@ data class Level(
     /** Порог 3 звёзд. */
     val star3: Int,
     val mask: List<List<Boolean>>,
+    /** Цель уровня (по умолчанию — набрать очки). */
+    val objective: Objective = Objective.Score,
 ) {
     /** Счёт, необходимый для прохождения уровня. */
     val passScore: Int get() = star1
@@ -40,25 +42,44 @@ object Levels {
         val mask = shapeFor(i)
         val playable = mask.sumOf { row -> row.count { it } }
         val moves = (25 - (i - 1)).coerceAtLeast(12)
+        val colors = (4 + (i - 1) / 3).coerceAtMost(6)
         // пороги звёзд завязаны на число ходов и размер поля (ожидаемый счёт за ход).
         // Играем до конца ходов, поэтому 3 звезды — сложно, но достижимо.
         val pf = playable.toDouble() / (N * N)
+        val objective = objectiveFor(i)
+        // защита от опечаток: цвет цели должен существовать на уровне
+        if (objective is Objective.Collect) {
+            check(objective.targets.keys.all { it.ordinal < colors }) {
+                "Level $i: цель использует цвет вне диапазона colors=$colors"
+            }
+        }
         Level(
             id = i,
             rows = N,
             cols = N,
-            colors = (4 + (i - 1) / 3).coerceAtMost(6),
+            colors = colors,
             moves = moves,
             star1 = roundTo((moves * 30 * pf).toInt(), 50).coerceAtLeast(150),
             star2 = roundTo((moves * 46 * pf).toInt(), 50).coerceAtLeast(250),
             star3 = roundTo((moves * 64 * pf).toInt(), 50).coerceAtLeast(350),
             mask = mask,
+            objective = objective,
         )
     }
 
     fun byId(id: Int): Level = all.first { it.id == id }
 
     private fun roundTo(value: Int, step: Int) = ((value + step / 2) / step) * step
+
+    /** Цель уровня: микс «набрать очки» и «собрать N шариков цвета». */
+    private fun objectiveFor(level: Int): Objective = when (level) {
+        3 -> Objective.Collect(linkedMapOf(GemColor.Red to 20))
+        5 -> Objective.Collect(linkedMapOf(GemColor.Blue to 22, GemColor.Green to 22))
+        7 -> Objective.Collect(linkedMapOf(GemColor.Yellow to 28))
+        8 -> Objective.Collect(linkedMapOf(GemColor.Red to 22, GemColor.Purple to 22))
+        10 -> Objective.Collect(linkedMapOf(GemColor.Green to 26, GemColor.Orange to 26, GemColor.Blue to 26))
+        else -> Objective.Score // 1,2,4,6,9
+    }
 
     /** Возвращает форму поля для уровня (предикат играбельности на сетке N×N). */
     private fun shapeFor(level: Int): List<List<Boolean>> {

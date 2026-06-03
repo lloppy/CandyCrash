@@ -16,6 +16,8 @@ data class MoveResult(
     val frames: List<List<List<Gem?>>>,
     val finalBoard: List<List<Gem?>>,
     val gainedScore: Int,
+    /** Сколько шариков каждого цвета убрано за ход (для целей "собрать"). */
+    val clearedByColor: Map<GemColor, Int> = emptyMap(),
 )
 
 private data class Analysis(
@@ -373,12 +375,19 @@ object Match3Engine {
         }
 
         val frames = mutableListOf<List<List<Gem?>>>()
+        val collected = HashMap<GemColor, Int>()
         var gained = 0
         var cascade = 0
 
         while (cascade < MAX_CASCADES) {
             gained += clear.size * CLEAR_POINTS + cascade * CASCADE_BONUS
             cascade++
+
+            // считаем убранные шарики по цвету (цветная бомба бесцветна — пропускаем)
+            for (p in clear) {
+                val g = board[p.row][p.col] ?: continue
+                if (g.special != Special.COLOR_BOMB) collected[g.color] = (collected[g.color] ?: 0) + 1
+            }
 
             val cleared = applyClear(board, clear, spawns)
             frames.add(cleared)
@@ -391,7 +400,7 @@ object Match3Engine {
             spawns = next.spawns
         }
 
-        return MoveResult(frames, board, gained)
+        return MoveResult(frames, board, gained, collected)
     }
 
     // ---------------------------------------------------------------------

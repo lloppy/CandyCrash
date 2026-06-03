@@ -25,6 +25,9 @@ import androidx.compose.ui.window.Dialog
 import com.jetbrains.kmpapp.theme.LocalIsDarkTheme
 import com.jetbrains.kmpapp.theme.StarryBackground
 
+/** Золотой акцент для звёзд (общий по всему приложению). */
+val Gold = Color(0xFFFFC107)
+
 /** Фон приложения: космический градиент + звёзды в тёмной теме, конфетный — в светлой. */
 @Composable
 fun GameBackground(modifier: Modifier = Modifier) {
