@@ -26,7 +26,6 @@ private data class Star(
     val twinkleOffset: Float,
 )
 
-/** Мерцающее звёздное небо для тёмной (космической) темы. */
 @Composable
 fun StarryBackground(
     modifier: Modifier = Modifier,

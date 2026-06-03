@@ -31,8 +31,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     val viewModel = koinViewModel<SettingsViewModel>()
-    val sound by viewModel.soundEnabled.collectAsStateWithLifecycle()
-    val vibration by viewModel.vibrationEnabled.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -50,14 +49,14 @@ fun SettingsScreen(
         Column(Modifier.padding(padding).padding(16.dp)) {
             SettingRow(
                 title = "Звук",
-                checked = sound,
-                onCheckedChange = viewModel::setSound,
+                checked = state.soundEnabled,
+                onCheckedChange = { viewModel.onIntent(SettingsIntent.SetSound(it)) },
             )
             HorizontalDivider()
             SettingRow(
                 title = "Вибрация",
-                checked = vibration,
-                onCheckedChange = viewModel::setVibration,
+                checked = state.vibrationEnabled,
+                onCheckedChange = { viewModel.onIntent(SettingsIntent.SetVibration(it)) },
             )
         }
     }

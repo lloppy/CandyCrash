@@ -5,9 +5,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * Настройки приложения, сохраняются между запусками через [Settings].
- */
 class SettingsRepository(
     private val settings: Settings,
 ) {
@@ -19,7 +16,6 @@ class SettingsRepository(
     val vibrationEnabled: StateFlow<Boolean> = _vibrationEnabled.asStateFlow()
 
     private val _darkTheme = MutableStateFlow(settings.getBoolean(KEY_DARK, false))
-    /** true — тёмная (космическая) тема. По умолчанию светлая. */
     val darkTheme: StateFlow<Boolean> = _darkTheme.asStateFlow()
 
     fun setSoundEnabled(enabled: Boolean) {

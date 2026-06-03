@@ -8,7 +8,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-// Космическая палитра (в стиле StarDust)
 private val DeepSpace = Color(0xFF0D0B1A)
 private val CosmicPurple = Color(0xFF1A0A2E)
 private val NightSky = Color(0xFF121228)
@@ -23,10 +22,8 @@ private val GoldAccent = Color(0xFFFFD700)
 private val SoftGold = Color(0xFFDAA520)
 private val StarPink = Color(0xFFE040FB)
 
-/** Светлая тема — обычная (как было). */
 private val LightColors = lightColorScheme()
 
-/** Тёмная тема — космос. */
 private val CosmicColors = darkColorScheme(
     primary = Amethyst,
     onPrimary = MoonWhite,
@@ -47,7 +44,6 @@ private val CosmicColors = darkColorScheme(
     surfaceContainerHigh = SurfaceCard,
 )
 
-/** Доступно во всём дереве: рисовать ли элементы в космическом (тёмном) стиле. */
 val LocalIsDarkTheme = staticCompositionLocalOf { false }
 
 @Composable

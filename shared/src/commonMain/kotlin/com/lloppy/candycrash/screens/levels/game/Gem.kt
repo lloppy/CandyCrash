@@ -2,7 +2,6 @@ package com.lloppy.candycrash.screens.levels.game
 
 import androidx.compose.ui.graphics.Color
 
-/** Базовый цвет шарика. */
 enum class GemColor(val color: Color) {
     Red(Color(0xFFE53935)),
     Blue(Color(0xFF1E88E5)),
@@ -17,20 +16,8 @@ enum class GemColor(val color: Color) {
     }
 }
 
-/**
- * Тип спецэлемента (бонуса), создаётся при совпадении 4+ шариков.
- *
- * - [ROCKET_H] / [ROCKET_V] — "ракета" (полосатая конфета): чистит строку/столбец.
- * - [BOMB] — "бомба" (обёрнутая конфета): взрыв 3×3.
- * - [COLOR_BOMB] — "звезда" (цветная бомба): убирает все шарики одного цвета.
- */
 enum class Special { NONE, ROCKET_H, ROCKET_V, BOMB, COLOR_BOMB }
 
-/**
- * Один шарик на поле: цвет + возможный бонус.
- * [id] — стабильный идентификатор для анимации перемещения/падения
- * (по нему UI отслеживает один и тот же шарик между кадрами).
- */
 data class Gem(
     val color: GemColor,
     val special: Special = Special.NONE,

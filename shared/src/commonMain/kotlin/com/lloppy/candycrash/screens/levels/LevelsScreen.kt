@@ -38,9 +38,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -63,6 +60,8 @@ import com.lloppy.candycrash.screens.levels.game.Gem
 import com.lloppy.candycrash.screens.levels.game.Level
 import com.lloppy.candycrash.screens.levels.game.Levels
 import com.lloppy.candycrash.screens.levels.game.Objective
+import com.lloppy.candycrash.screens.levels.screens.levels.LevelsEffect
+import com.lloppy.candycrash.screens.levels.screens.levels.LevelsIntent
 import com.lloppy.candycrash.screens.levels.screens.levels.LevelsViewModel
 import com.lloppy.candycrash.screens.levels.ui.GameBackground
 import com.lloppy.candycrash.screens.levels.ui.GameDialog
@@ -75,10 +74,9 @@ import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.PI
 import kotlin.math.sin
 
-private const val NODE = 78          // диаметр узла, dp
-private val ROW_HEIGHT = 132.dp      // высота строки одного уровня
+private const val NODE = 78
+private val ROW_HEIGHT = 132.dp
 
-/** Доля по горизонтали для узла i (змейка). Единый источник для дорожки и узлов. */
 private fun xFrac(i: Int): Float = 0.5f + 0.30f * sin(i * (PI / 2)).toFloat()
 
 @Composable
@@ -87,16 +85,20 @@ fun LevelsScreen(
     onBack: () -> Unit,
 ) {
     val viewModel = koinViewModel<LevelsViewModel>()
-    val highestUnlocked by viewModel.highestUnlocked.collectAsStateWithLifecycle()
-    val stars by viewModel.stars.collectAsStateWithLifecycle()
-
-    var infoLevel by remember { mutableStateOf<Level?>(null) }
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val scroll = rememberScrollState()
     val density = LocalDensity.current
 
-    // авто-скролл к текущему (последнему открытому) уровню
-    LaunchedEffect(highestUnlocked) {
-        val targetPx = with(density) { (ROW_HEIGHT * (highestUnlocked - 1)).toPx() }.toInt()
+    LaunchedEffect(Unit) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is LevelsEffect.NavigateToGame -> onLevelClick(effect.levelId)
+            }
+        }
+    }
+
+    LaunchedEffect(state.highestUnlocked) {
+        val targetPx = with(density) { (ROW_HEIGHT * (state.highestUnlocked - 1)).toPx() }.toInt()
         scroll.animateScrollTo(targetPx.coerceAtLeast(0))
     }
 
@@ -108,7 +110,6 @@ fun LevelsScreen(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
-            // шапка-баннер
             Row(
                 Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -122,27 +123,26 @@ fun LevelsScreen(
                 Spacer(Modifier.size(46.dp))
             }
 
-            // прокручиваемая карта-змейка
             Box(
                 Modifier
                     .fillMaxWidth()
                     .verticalScroll(scroll),
             ) {
                 LevelMap(
-                    highestUnlocked = highestUnlocked,
-                    starsByLevel = stars,
-                    onNodeClick = { lvl -> infoLevel = lvl },
+                    highestUnlocked = state.highestUnlocked,
+                    starsByLevel = state.stars,
+                    onNodeClick = { lvl -> viewModel.onIntent(LevelsIntent.NodeClicked(lvl)) },
                 )
             }
         }
     }
 
-    infoLevel?.let { lvl ->
+    state.infoLevel?.let { lvl ->
         LevelInfoDialog(
             level = lvl,
-            bestStars = stars[lvl.id] ?: 0,
-            onPlay = { infoLevel = null; onLevelClick(lvl.id) },
-            onDismiss = { infoLevel = null },
+            bestStars = state.stars[lvl.id] ?: 0,
+            onPlay = { viewModel.onIntent(LevelsIntent.PlayClicked(lvl.id)) },
+            onDismiss = { viewModel.onIntent(LevelsIntent.DismissInfo) },
         )
     }
 }
@@ -164,7 +164,6 @@ private fun LevelMap(
         val w = maxWidth
         val nodeSize = NODE.dp
 
-        // дорожка между центрами узлов (плавная змейка)
         Canvas(Modifier.fillMaxSize()) {
             val path = Path()
             fun cx(i: Int) = size.width * xFrac(i)
@@ -185,7 +184,6 @@ private fun LevelMap(
             )
         }
 
-        // узлы (снизу — первый уровень виден последним; рисуем сверху вниз 1..N)
         for (i in 0 until count) {
             val level = Levels.all[i]
             val unlocked = level.id <= highestUnlocked
@@ -216,7 +214,7 @@ private fun LevelNode(
     stars: Int,
     onClick: () -> Unit,
 ) {
-    // пульс текущего узла
+
     val pulse = if (isCurrent) {
         val t = rememberInfiniteTransition(label = "pulse")
         t.animateFloat(
@@ -277,7 +275,7 @@ private fun LevelInfoDialog(
     GameDialog(onDismiss = onDismiss) {
         GameTitle(text = "Уровень ${level.id}", fontSize = 28.sp)
         Spacer(Modifier.height(8.dp))
-        // лучший результат
+
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(3) { s ->
                 Icon(
@@ -289,7 +287,7 @@ private fun LevelInfoDialog(
             }
         }
         Spacer(Modifier.height(16.dp))
-        // цель
+
         Text(
             text = "Цель",
             fontSize = 13.sp,
@@ -321,7 +319,7 @@ private fun LevelInfoDialog(
             }
         }
         Spacer(Modifier.height(10.dp))
-        // пороги звёзд по очкам
+
         Text(
             text = "★ ${level.star1}   ★★ ${level.star2}   ★★★ ${level.star3}",
             fontSize = 13.sp,

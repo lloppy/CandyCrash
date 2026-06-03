@@ -69,24 +69,37 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.lloppy.candycrash.screens.levels.game.ActivationFx
 import com.lloppy.candycrash.screens.levels.game.Gem
 import com.lloppy.candycrash.screens.levels.game.GemColor
+import com.lloppy.candycrash.screens.levels.game.Levels
+import com.lloppy.candycrash.screens.levels.game.Objective
+import com.lloppy.candycrash.screens.levels.game.Pos
+import com.lloppy.candycrash.screens.levels.game.SettingsRepository
+import com.lloppy.candycrash.screens.levels.game.Special
+import com.lloppy.candycrash.screens.levels.theme.LocalIsDarkTheme
 import com.lloppy.candycrash.screens.levels.ui.ConfettiOverlay
+import com.lloppy.candycrash.screens.levels.ui.GameBackground
+import com.lloppy.candycrash.screens.levels.ui.GameDialog
 import com.lloppy.candycrash.screens.levels.ui.GameTitle
+import com.lloppy.candycrash.screens.levels.ui.GemVisual
 import com.lloppy.candycrash.screens.levels.ui.GlossyCard
+import com.lloppy.candycrash.screens.levels.ui.RoundIconButton
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.collections.iterator
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 private val Gold = Color(0xFFFFC107)
 
-// Падение с постоянной скоростью (мс/клетку), с порогами. Синхронно с GameViewModel.
 private const val MS_PER_CELL = 55
 private const val MIN_MOVE_MS = 170
 private const val MAX_MOVE_MS = 480
@@ -102,14 +115,14 @@ fun GameScreen(
     onNextLevel: (Int) -> Unit,
 ) {
     val viewModel = koinViewModel<GameViewModel> { parametersOf(levelId) }
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
-    val settings = koinInject<com.lloppy.candycrash.screens.levels.game.SettingsRepository>()
+    val settings = koinInject<SettingsRepository>()
     val sound by settings.soundEnabled.collectAsStateWithLifecycle()
     var showPause by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
-        _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GameBackground()
+        GameBackground()
 
         Column(
             modifier = Modifier
@@ -117,18 +130,18 @@ fun GameScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(16.dp),
         ) {
-            // верхняя панель
+
             Row(verticalAlignment = Alignment.CenterVertically) {
-                _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.RoundIconButton(onClick = onBack) {
+                RoundIconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GameTitle(
+                    GameTitle(
                         text = "Уровень $levelId",
                         fontSize = 24.sp
                     )
                 }
-                _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.RoundIconButton(onClick = {
+                RoundIconButton(onClick = {
                     showPause = true
                 }) {
                     Icon(Icons.Filled.Settings, contentDescription = "Меню")
@@ -142,9 +155,9 @@ fun GameScreen(
                 movesLeft = state.movesLeft,
                 objective = state.objective,
                 collected = state.collected,
-                star1 = viewModel.star1,
-                star2 = viewModel.star2,
-                star3 = viewModel.star3,
+                star1 = state.star1,
+                star2 = state.star2,
+                star3 = state.star3,
             )
 
             Spacer(Modifier.height(20.dp))
@@ -152,12 +165,13 @@ fun GameScreen(
             BoardFrame {
                 GameBoard(
                     board = state.board,
-                    shape = viewModel.shape,
+                    shape = state.shape,
                     selected = state.selected,
                     clearing = state.clearing,
+                    effects = state.effects,
                     enabled = !state.busy && state.status == GameStatus.Playing,
-                    onCellTap = viewModel::onCellClick,
-                    onSwipe = viewModel::applyMove,
+                    onCellTap = { viewModel.onIntent(GameIntent.CellClicked(it)) },
+                    onSwipe = { from, to -> viewModel.onIntent(GameIntent.Swiped(from, to)) },
                 )
             }
         }
@@ -168,8 +182,8 @@ fun GameScreen(
             won = state.status == GameStatus.Won,
             score = state.score,
             stars = state.earnedStars,
-            hasNext = levelId < _root_ide_package_.com.lloppy.candycrash.screens.levels.game.Levels.COUNT,
-            onRetry = viewModel::restart,
+            hasNext = levelId < Levels.COUNT,
+            onRetry = { viewModel.onIntent(GameIntent.Restart) },
             onNext = { onNextLevel(levelId + 1) },
             onExit = onBack,
         )
@@ -180,7 +194,7 @@ fun GameScreen(
             sound = sound,
             onToggleSound = settings::setSoundEnabled,
             onResume = { showPause = false },
-            onRestart = { showPause = false; viewModel.restart() },
+            onRestart = { showPause = false; viewModel.onIntent(GameIntent.Restart) },
             onExit = onBack,
         )
     }
@@ -194,8 +208,8 @@ private fun PauseDialog(
     onRestart: () -> Unit,
     onExit: () -> Unit,
 ) {
-    _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GameDialog(onDismiss = onResume) {
-        _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GameTitle(
+    GameDialog(onDismiss = onResume) {
+        GameTitle(
             text = "Пауза",
             fontSize = 28.sp
         )
@@ -221,21 +235,17 @@ private fun PauseDialog(
     }
 }
 
-// ---------------------------------------------------------------------
-// Панель счёта/ходов со звёздным прогрессом
-// ---------------------------------------------------------------------
-
 @Composable
 private fun StatsPanel(
     score: Int,
     movesLeft: Int,
-    objective: com.lloppy.candycrash.screens.levels.game.Objective,
+    objective: Objective,
     collected: Map<GemColor, Int>,
     star1: Int,
     star2: Int,
     star3: Int,
 ) {
-    _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GlossyCard(Modifier.fillMaxWidth()) {
+    GlossyCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -250,7 +260,7 @@ private fun StatsPanel(
                     modifier = Modifier.weight(1f),
                 )
                 when (objective) {
-                    _root_ide_package_.com.lloppy.candycrash.screens.levels.game.Objective.Score -> StatPill(
+                    Objective.Score -> StatPill(
                         label = "ОЧКИ",
                         value = score.toString(),
                         container = MaterialTheme.colorScheme.primaryContainer,
@@ -258,7 +268,7 @@ private fun StatsPanel(
                         modifier = Modifier.weight(1f),
                     )
 
-                    is com.lloppy.candycrash.screens.levels.game.Objective.Collect -> Row(
+                    is Objective.Collect -> Row(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(
                             8.dp,
@@ -273,14 +283,13 @@ private fun StatsPanel(
                     }
                 }
             }
-            // звёздный прогресс по очкам — показываем всегда (звёзды по очкам)
+
             Spacer(Modifier.height(14.dp))
             StarProgressBar(score = score, star1 = star1, star2 = star2, star3 = star3)
         }
     }
 }
 
-/** Чип цели «собрать»: иконка цвета (под тему) + остаток. */
 @Composable
 private fun CollectChip(color: GemColor, remaining: Int) {
     val done = remaining == 0
@@ -292,7 +301,7 @@ private fun CollectChip(color: GemColor, remaining: Int) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GemVisual(
+        GemVisual(
             gem = Gem(color),
             modifier = Modifier.size(26.dp)
         )
@@ -348,7 +357,7 @@ private fun StarProgressBar(score: Int, star1: Int, star2: Int, star3: Int) {
         contentAlignment = Alignment.CenterStart,
     ) {
         val w = maxWidth
-        // дорожка
+
         Box(
             Modifier
                 .fillMaxWidth()
@@ -357,7 +366,7 @@ private fun StarProgressBar(score: Int, star1: Int, star2: Int, star3: Int) {
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .align(Alignment.CenterStart),
         )
-        // заполнение
+
         Box(
             Modifier
                 .fillMaxWidth(animated)
@@ -366,7 +375,7 @@ private fun StarProgressBar(score: Int, star1: Int, star2: Int, star3: Int) {
                 .background(Brush.horizontalGradient(listOf(Color(0xFFFFB300), Gold)))
                 .align(Alignment.CenterStart),
         )
-        // три звезды на порогах
+
         listOf(star1, star2, star3).forEach { threshold ->
             val pos = (threshold.toFloat() / maxScore).coerceIn(0f, 1f)
             val reached = score >= threshold
@@ -390,13 +399,9 @@ private fun StarProgressBar(score: Int, star1: Int, star2: Int, star3: Int) {
     }
 }
 
-// ---------------------------------------------------------------------
-// Поле в рамке с подложкой-плитками
-// ---------------------------------------------------------------------
-
 @Composable
 private fun BoardFrame(content: @Composable () -> Unit) {
-    val dark = _root_ide_package_.com.lloppy.candycrash.screens.levels.theme.LocalIsDarkTheme.current
+    val dark = LocalIsDarkTheme.current
     val outer = if (dark) {
         Brush.verticalGradient(listOf(Color(0xFF3A2E66), Color(0xFF1E1840)))
     } else {
@@ -413,7 +418,7 @@ private fun BoardFrame(content: @Composable () -> Unit) {
             .background(outer)
             .padding(10.dp),
     ) {
-        // утопленная внутренняя панель
+
         Box(
             Modifier
                 .fillMaxSize()
@@ -424,12 +429,11 @@ private fun BoardFrame(content: @Composable () -> Unit) {
     }
 }
 
-/** Перетаскивание: шарик [aId] едет за пальцем, сосед [bId] — навстречу. */
 private data class DragState(
     val aId: Long,
     val bId: Long,
-    val a: com.lloppy.candycrash.screens.levels.game.Pos,
-    val b: com.lloppy.candycrash.screens.levels.game.Pos,
+    val a: Pos,
+    val b: Pos,
     val horizontal: Boolean,
     val sign: Int,
     val vec: Offset,
@@ -439,11 +443,12 @@ private data class DragState(
 private fun GameBoard(
     board: List<List<Gem?>>,
     shape: List<List<Boolean>>,
-    selected: com.lloppy.candycrash.screens.levels.game.Pos?,
+    selected: Pos?,
     clearing: List<ClearFx>,
+    effects: List<ActivationFx>,
     enabled: Boolean,
-    onCellTap: (com.lloppy.candycrash.screens.levels.game.Pos) -> Unit,
-    onSwipe: (com.lloppy.candycrash.screens.levels.game.Pos, com.lloppy.candycrash.screens.levels.game.Pos) -> Unit,
+    onCellTap: (Pos) -> Unit,
+    onSwipe: (Pos, Pos) -> Unit,
 ) {
     if (board.isEmpty()) return
     val rows = board.size
@@ -455,13 +460,12 @@ private fun GameBoard(
         val cell = maxWidth / cols
         val cellPx = with(LocalDensity.current) { cell.toPx() }
 
-        fun toCell(off: Offset) = _root_ide_package_.com.lloppy.candycrash.screens.levels.game.Pos(
+        fun toCell(off: Offset) = Pos(
             row = (off.y / cellPx).toInt().coerceIn(0, rows - 1),
             col = (off.x / cellPx).toInt().coerceIn(0, cols - 1),
         )
-        fun playable(p: com.lloppy.candycrash.screens.levels.game.Pos) = shape.getOrNull(p.row)?.getOrNull(p.col) == true
+        fun playable(p: Pos) = shape.getOrNull(p.row)?.getOrNull(p.col) == true
 
-        // стартовые строки для НОВЫХ шариков — стопкой над полем (без наложений)
         val prevIds = remember { mutableStateOf(emptySet<Long>()) }
         val startRowById = remember(board) {
             val map = HashMap<Long, Int>()
@@ -481,10 +485,8 @@ private fun GameBoard(
 
         val boardState = rememberUpdatedState(board)
         var drag by remember { mutableStateOf<DragState?>(null) }
-        fun idAt(p: com.lloppy.candycrash.screens.levels.game.Pos) = boardState.value.getOrNull(p.row)?.getOrNull(p.col)?.id
+        fun idAt(p: Pos) = boardState.value.getOrNull(p.row)?.getOrNull(p.col)?.id
 
-        // На отпускании просто фиксируем обмен (синхронно) и снимаем drag —
-        // каждый шарик сам плавно доедет до клетки из текущей позиции под пальцем.
         fun finishDrag(commit: Boolean) {
             val d = drag ?: return
             if (commit) onSwipe(d.a, d.b)
@@ -498,7 +500,7 @@ private fun GameBoard(
             }
             .pointerInput(rows, cols, cellPx, enabled) {
                 if (!enabled) return@pointerInput
-                var start: com.lloppy.candycrash.screens.levels.game.Pos? = null
+                var start: Pos? = null
                 var acc = Offset.Zero
                 detectDragGestures(
                     onDragStart = { off -> start = toCell(off).takeIf { playable(it) }; acc = Offset.Zero },
@@ -516,10 +518,10 @@ private fun GameBoard(
                     if (drag == null && acc.getDistance() > cellPx * 0.12f) {
                         val horizontal = abs(acc.x) >= abs(acc.y)
                         val sign = if (horizontal) (if (acc.x > 0) 1 else -1) else (if (acc.y > 0) 1 else -1)
-                        val target = if (horizontal) _root_ide_package_.com.lloppy.candycrash.screens.levels.game.Pos(
+                        val target = if (horizontal) Pos(
                             s.row,
                             s.col + sign
-                        ) else _root_ide_package_.com.lloppy.candycrash.screens.levels.game.Pos(
+                        ) else Pos(
                             s.row + sign,
                             s.col
                         )
@@ -547,7 +549,7 @@ private fun GameBoard(
                 .height(cell * rows)
                 .then(gestures),
         ) {
-            // подложка-плитки (форма поля)
+
             Column {
                 for (r in 0 until rows) {
                     Row {
@@ -567,7 +569,7 @@ private fun GameBoard(
                     }
                 }
             }
-            // шарики: одна анимируемая позиция; при перетаскивании едут за пальцем
+
             val d = drag
             for (r in 0 until rows) {
                 for (c in 0 until cols) {
@@ -589,7 +591,7 @@ private fun GameBoard(
                             dragging = dragging,
                             cell = cell,
                             cellPx = cellPx,
-                            selected = selected == _root_ide_package_.com.lloppy.candycrash.screens.levels.game.Pos(
+                            selected = selected == Pos(
                                 r,
                                 c
                             ),
@@ -597,17 +599,170 @@ private fun GameBoard(
                     }
                 }
             }
-            // эффект "поп" — совпавшие шарики сжимаются
+
             for (fx in clearing) {
                 key("fx", fx.gem.id) {
                     ClearGem(fx = fx, cell = cell, cellPx = cellPx)
+                }
+            }
+
+            if (effects.isNotEmpty()) {
+                key(effects) {
+                    EffectsOverlay(effects = effects, cellPx = cellPx)
                 }
             }
         }
     }
 }
 
-/** Шарик, анимирующий позицию по id: новые падают сверху (со [startRow]), уцелевшие съезжают. */
+@Composable
+private fun EffectsOverlay(
+    effects: List<ActivationFx>,
+    cellPx: Float,
+) {
+    val t = remember { Animatable(0f) }
+    LaunchedEffect(effects) {
+        t.snapTo(0f)
+        t.animateTo(1f, animationSpec = tween(EFFECT_FX_MS))
+    }
+    androidx.compose.foundation.Canvas(Modifier.fillMaxSize().zIndex(3f)) {
+        for (fx in effects) drawActivation(fx, t.value, cellPx)
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawActivation(
+    fx: ActivationFx,
+    t: Float,
+    cellPx: Float,
+) {
+    val cx = (fx.col + 0.5f) * cellPx
+    val cy = (fx.row + 0.5f) * cellPx
+    val fade = 1f - t
+    val white = Color.White
+    val flash = Color(0xFFFFF3C4)
+    val orange = Color(0xFFFF7A18)
+    when (fx.type) {
+        Special.ROCKET_H ->
+            drawBeam(cx, cy, t, cellPx, horizontal = true)
+        Special.ROCKET_V ->
+            drawBeam(cx, cy, t, cellPx, horizontal = false)
+        Special.BOMB -> {
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(white.copy(alpha = fade), flash.copy(alpha = fade * 0.8f), orange.copy(alpha = 0f)),
+                    center = Offset(cx, cy),
+                    radius = cellPx * (0.6f + t * 0.9f),
+                ),
+                radius = cellPx * (0.6f + t * 0.9f),
+                center = Offset(cx, cy),
+            )
+
+            drawCircle(
+                color = flash.copy(alpha = fade),
+                radius = cellPx * (0.4f + t * 1.9f),
+                center = Offset(cx, cy),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = cellPx * 0.22f * fade),
+            )
+
+            val len = cellPx * (0.7f + t * 1.5f)
+            for (i in 0 until 8) {
+                val ang = (i * (PI / 4)).toFloat()
+                val dx = cos(ang); val dy = sin(ang)
+                drawLine(
+                    color = orange.copy(alpha = fade),
+                    start = Offset(cx + dx * cellPx * 0.4f, cy + dy * cellPx * 0.4f),
+                    end = Offset(cx + dx * len, cy + dy * len),
+                    strokeWidth = cellPx * 0.12f * fade,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                )
+            }
+        }
+        Special.COLOR_BOMB -> {
+
+            val rings = listOf(
+                Color(0xFFFF5252), Color(0xFFFFD740), Color(0xFF69F0AE), Color(0xFF40C4FF), Color(0xFFE040FB),
+            )
+            rings.forEachIndexed { i, col ->
+                val rr = cellPx * (0.4f + t * (1.6f + i * 0.35f))
+                drawCircle(
+                    color = col.copy(alpha = fade * 0.9f),
+                    radius = rr,
+                    center = Offset(cx, cy),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = cellPx * 0.1f * fade),
+                )
+            }
+
+            val len = cellPx * (0.6f + t * 2.4f)
+            for (i in 0 until 12) {
+                val ang = (i * (PI / 6) + t * 0.8f).toFloat()
+                val dx = cos(ang); val dy = sin(ang)
+                drawLine(
+                    color = rings[i % rings.size].copy(alpha = fade),
+                    start = Offset(cx + dx * cellPx * 0.3f, cy + dy * cellPx * 0.3f),
+                    end = Offset(cx + dx * len, cy + dy * len),
+                    strokeWidth = cellPx * 0.1f * fade,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                )
+            }
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(white.copy(alpha = fade), white.copy(alpha = 0f)),
+                    center = Offset(cx, cy),
+                    radius = cellPx * (0.5f + t * 0.7f),
+                ),
+                radius = cellPx * (0.5f + t * 0.7f),
+                center = Offset(cx, cy),
+            )
+        }
+        Special.NONE -> Unit
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBeam(
+    cx: Float,
+    cy: Float,
+    t: Float,
+    cellPx: Float,
+    horizontal: Boolean,
+) {
+    val fade = 1f - t
+    val white = Color.White
+    val core = Color(0xFFB3E5FC)
+    val thick = cellPx * (0.5f * (1f - t) + 0.15f)
+    if (horizontal) {
+        val half = thick / 2f
+        drawRect(
+            brush = Brush.verticalGradient(
+                listOf(core.copy(alpha = 0f), white.copy(alpha = fade), core.copy(alpha = 0f)),
+                startY = cy - half, endY = cy + half,
+            ),
+            topLeft = Offset(0f, cy - half),
+            size = androidx.compose.ui.geometry.Size(size.width, thick),
+        )
+
+        val headX = t * size.width
+        drawCircle(white.copy(alpha = fade), cellPx * 0.28f * fade.coerceAtLeast(0.3f), Offset(cx + headX, cy))
+        drawCircle(white.copy(alpha = fade), cellPx * 0.28f * fade.coerceAtLeast(0.3f), Offset(cx - headX, cy))
+    } else {
+        val half = thick / 2f
+        drawRect(
+            brush = Brush.horizontalGradient(
+                listOf(core.copy(alpha = 0f), white.copy(alpha = fade), core.copy(alpha = 0f)),
+                startX = cx - half, endX = cx + half,
+            ),
+            topLeft = Offset(cx - half, 0f),
+            size = androidx.compose.ui.geometry.Size(thick, size.height),
+        )
+        val headY = t * size.height
+        drawCircle(white.copy(alpha = fade), cellPx * 0.28f * fade.coerceAtLeast(0.3f), Offset(cx, cy + headY))
+        drawCircle(white.copy(alpha = fade), cellPx * 0.28f * fade.coerceAtLeast(0.3f), Offset(cx, cy - headY))
+    }
+}
+
+private const val EFFECT_FX_MS = 320
+
 @Composable
 private fun AnimatedGem(
     gem: Gem,
@@ -621,14 +776,14 @@ private fun AnimatedGem(
     cellPx: Float,
     selected: Boolean,
 ) {
-    // единая позиция шарика в пикселях; init: новые — над полем (startRow), падают вниз
+
     val animX = remember { Animatable(col * cellPx) }
     val animY = remember { Animatable(startRow * cellPx) }
     val targetX = col * cellPx + dragX
     val targetY = row * cellPx + dragY
     LaunchedEffect(targetX, targetY, dragging) {
         if (dragging) {
-            // под палец — мгновенно
+
             animX.snapTo(targetX)
             animY.snapTo(targetY)
         } else {
@@ -653,7 +808,7 @@ private fun AnimatedGem(
             .size(cell)
             .zIndex(if (dragging || selected) 1f else 0f),
     ) {
-        _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GemVisual(
+        GemVisual(
             gem = gem,
             selected = selected,
             modifier = Modifier.fillMaxSize().padding(3.dp).scale(selScale),
@@ -661,7 +816,6 @@ private fun AnimatedGem(
     }
 }
 
-/** Анимация исчезновения совпавшего шарика: быстро сжимается и гаснет. */
 @Composable
 private fun ClearGem(fx: ClearFx, cell: Dp, cellPx: Float) {
     val scale = remember { Animatable(1f) }
@@ -672,7 +826,7 @@ private fun ClearGem(fx: ClearFx, cell: Dp, cellPx: Float) {
             .size(cell)
             .zIndex(2f),
     ) {
-        _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GemVisual(
+        GemVisual(
             gem = fx.gem,
             modifier = Modifier.fillMaxSize().padding(3.dp).scale(scale.value),
         )
@@ -694,7 +848,7 @@ private fun ResultDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            // салют — в окне диалога, поверх затемнения, позади карточки
+
             if (won) ConfettiOverlay(Modifier.fillMaxSize())
 
             GlossyCard(Modifier.fillMaxWidth(0.82f), cornerRadius = 26.dp) {
@@ -734,7 +888,6 @@ private fun ResultDialog(
     }
 }
 
-/** Звезда результата: появляется с задержкой и лёгким «отскоком». */
 @Composable
 private fun ResultStar(earned: Boolean, index: Int) {
     val scale = remember { Animatable(0f) }

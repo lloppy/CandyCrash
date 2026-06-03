@@ -4,32 +4,23 @@ import kotlin.collections.iterator
 import kotlin.math.abs
 import kotlin.random.Random
 
-/** Позиция клетки на поле. */
 data class Pos(val row: Int, val col: Int)
 
-/**
- * Результат хода: последовательность кадров для анимации + итог.
- *
- * Поле представлено как `List<List<Gem?>>`, где `null` — пустая клетка:
- * либо заблокированная формой уровня, либо временно опустевшая во время каскада.
- */
 data class MoveResult(
     val frames: List<List<List<Gem?>>>,
     val finalBoard: List<List<Gem?>>,
     val gainedScore: Int,
-    /** Сколько шариков каждого цвета убрано за ход (для целей "собрать"). */
     val clearedByColor: Map<GemColor, Int> = emptyMap(),
+    val activations: List<List<ActivationFx>> = emptyList(),
 )
+
+data class ActivationFx(val type: Special, val row: Int, val col: Int)
 
 private data class Analysis(
     val matched: Set<Pos>,
     val spawns: Map<Pos, Gem>,
 )
 
-/**
- * Логика "Три в ряд" в стиле Candy Crush: спецэлементы, комбинации, каскады.
- * Учитывает форму поля (заблокированные клетки) из [Level.mask].
- */
 object Match3Engine {
 
     private const val CLEAR_POINTS = 10
@@ -42,17 +33,11 @@ object Match3Engine {
     private fun randomGem(colors: Int, random: Random): Gem =
         Gem(GemColor.entries[random.nextInt(colors)], id = newId())
 
-    /** Совпадают по цвету (цветные бомбы и пустые клетки не участвуют в линиях). */
     private fun colorMatch(a: Gem?, b: Gem?): Boolean =
         a != null && b != null &&
             a.special != Special.COLOR_BOMB && b.special != Special.COLOR_BOMB &&
             a.color == b.color
 
-    // ---------------------------------------------------------------------
-    // Создание поля
-    // ---------------------------------------------------------------------
-
-    /** Заполняет играбельные клетки без готовых совпадений; пустые — null. */
     fun createBoard(level: Level, random: Random): List<List<Gem?>> {
         val grid = MutableList(level.rows) { MutableList<Gem?>(level.cols) { null } }
         for (r in 0 until level.rows) {
@@ -81,10 +66,6 @@ object Match3Engine {
         grid[b.row][b.col] = tmp
         return grid.map { it.toList() }
     }
-
-    // ---------------------------------------------------------------------
-    // Совпадения и спецэлементы
-    // ---------------------------------------------------------------------
 
     fun findMatches(board: List<List<Gem?>>): Set<Pos> {
         if (board.isEmpty()) return emptySet()
@@ -199,10 +180,6 @@ object Match3Engine {
         return Analysis(matched, spawns)
     }
 
-    // ---------------------------------------------------------------------
-    // Активация спецэлементов и цепные реакции
-    // ---------------------------------------------------------------------
-
     private fun mostCommonColor(board: List<List<Gem?>>): GemColor {
         val counts = HashMap<GemColor, Int>()
         for (row in board) for (g in row) {
@@ -214,7 +191,6 @@ object Match3Engine {
     private fun inBounds(board: List<List<Gem?>>, r: Int, c: Int) =
         r in board.indices && c in board[0].indices
 
-    /** Расширяет очистку: спецэлементы внутри неё активируются (цепная реакция). */
     private fun expandBlast(board: List<List<Gem?>>, initial: Set<Pos>): Set<Pos> {
         val rows = board.size
         val cols = board[0].size
@@ -245,7 +221,6 @@ object Match3Engine {
         return cleared
     }
 
-    /** Активация при обмене спецэлементов (или цветной бомбы с обычным шариком). */
     private fun swapActivation(board: List<List<Gem?>>, a: Pos, b: Pos): Set<Pos>? {
         val ga = board[a.row][a.col] ?: return null
         val gb = board[b.row][b.col] ?: return null
@@ -307,10 +282,6 @@ object Match3Engine {
         return null
     }
 
-    // ---------------------------------------------------------------------
-    // Очистка, гравитация (по сегментам формы), досыпка
-    // ---------------------------------------------------------------------
-
     private fun applyClear(
         board: List<List<Gem?>>,
         clear: Set<Pos>,
@@ -322,11 +293,6 @@ object Match3Engine {
         return grid.map { it.toList() }
     }
 
-    /**
-     * Гравитация с учётом формы: в каждом столбце шарики падают вниз внутри
-     * непрерывных сегментов играбельных клеток, сверху досыпаются новые.
-     * Заблокированные клетки остаются пустыми и работают как "пол".
-     */
     private fun collapseAndRefill(
         board: List<List<Gem?>>,
         level: Level,
@@ -341,7 +307,6 @@ object Match3Engine {
                 if (!level.playable(r, c)) { r++; continue }
                 var end = r
                 while (end < rows && level.playable(end, c)) end++
-                // сегмент строк [r, end)
                 val existing = ArrayList<Gem>()
                 for (row in r until end) board[row][c]?.let { existing.add(it) }
                 val newCount = (end - r) - existing.size
@@ -355,10 +320,6 @@ object Match3Engine {
         }
         return grid.map { it.toList() }
     }
-
-    // ---------------------------------------------------------------------
-    // Полный ход
-    // ---------------------------------------------------------------------
 
     fun tryMove(initial: List<List<Gem?>>, a: Pos, b: Pos, level: Level, random: Random): MoveResult? {
         var board = swapped(initial, a, b)
@@ -376,6 +337,7 @@ object Match3Engine {
         }
 
         val frames = mutableListOf<List<List<Gem?>>>()
+        val activations = mutableListOf<List<ActivationFx>>()
         val collected = HashMap<GemColor, Int>()
         var gained = 0
         var cascade = 0
@@ -384,11 +346,13 @@ object Match3Engine {
             gained += clear.size * CLEAR_POINTS + cascade * CASCADE_BONUS
             cascade++
 
-            // считаем убранные шарики по цвету (цветная бомба бесцветна — пропускаем)
+            val acts = mutableListOf<ActivationFx>()
             for (p in clear) {
                 val g = board[p.row][p.col] ?: continue
                 if (g.special != Special.COLOR_BOMB) collected[g.color] = (collected[g.color] ?: 0) + 1
+                if (g.special != Special.NONE) acts.add(ActivationFx(g.special, p.row, p.col))
             }
+            activations.add(acts)
 
             val cleared = applyClear(board, clear, spawns)
             frames.add(cleared)
@@ -401,14 +365,9 @@ object Match3Engine {
             spawns = next.spawns
         }
 
-        return MoveResult(frames, board, gained, collected)
+        return MoveResult(frames, board, gained, collected, activations)
     }
 
-    // ---------------------------------------------------------------------
-    // Доступность ходов
-    // ---------------------------------------------------------------------
-
-    /** Есть ли полезный ход (или цветная бомба, которой всегда можно сходить). */
     fun hasAvailableMove(board: List<List<Gem?>>): Boolean {
         val rows = board.size
         val cols = board[0].size

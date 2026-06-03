@@ -38,6 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lloppy.candycrash.screens.levels.game.Gem
 import com.lloppy.candycrash.screens.levels.game.GemColor
+import com.lloppy.candycrash.screens.levels.ui.GameBackground
+import com.lloppy.candycrash.screens.levels.ui.GameTitle
+import com.lloppy.candycrash.screens.levels.ui.GemVisual
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -50,9 +53,8 @@ fun HomeScreen(
     onSettings: () -> Unit,
 ) {
     Box(Modifier.fillMaxSize()) {
-        _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GameBackground()
+        GameBackground()
 
-        // переключатель темы в правом верхнем углу
         Box(
             Modifier
                 .fillMaxSize()
@@ -74,10 +76,10 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            // декоративный ряд шариков (в тёмной теме — планеты)
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 GemColor.entries.take(5).forEach { color ->
-                    _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GemVisual(
+                    GemVisual(
                         gem = Gem(
                             color
                         ), modifier = Modifier.size(40.dp)
@@ -87,7 +89,7 @@ fun HomeScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            _root_ide_package_.com.lloppy.candycrash.screens.levels.ui.GameTitle(
+            GameTitle(
                 text = "Три в ряд",
                 fontSize = 46.sp
             )
@@ -121,7 +123,6 @@ fun HomeScreen(
     }
 }
 
-/** Кнопка-переключатель темы: луна (перейти в тёмную) / солнце (перейти в светлую). */
 @Composable
 private fun ThemeToggle(
     dark: Boolean,
@@ -140,7 +141,7 @@ private fun ThemeToggle(
             val r = size.minDimension / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
             if (dark) {
-                // солнце — переключиться на светлую
+
                 drawCircle(gold, radius = r * 0.5f, center = center)
                 for (i in 0 until 8) {
                     val a = i * (PI / 4)
@@ -154,7 +155,7 @@ private fun ThemeToggle(
                     )
                 }
             } else {
-                // луна — переключиться на тёмную
+
                 val outer = Path().apply { addOval(Rect(center, r * 0.8f)) }
                 val cut = Path().apply {
                     addOval(Rect(Offset(center.x + r * 0.45f, center.y - r * 0.12f), r * 0.78f))

@@ -9,6 +9,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.lloppy.candycrash.screens.levels.game.SettingsRepository
+import com.lloppy.candycrash.screens.levels.screens.game.GameScreen
+import com.lloppy.candycrash.screens.levels.screens.home.HomeScreen
+import com.lloppy.candycrash.screens.levels.screens.settings.SettingsScreen
+import com.lloppy.candycrash.screens.levels.theme.GameTheme
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
@@ -26,15 +31,15 @@ data class GameDestination(val levelId: Int)
 
 @Composable
 fun App() {
-    val settings = koinInject<com.lloppy.candycrash.screens.levels.game.SettingsRepository>()
+    val settings = koinInject<SettingsRepository>()
     val darkTheme by settings.darkTheme.collectAsStateWithLifecycle()
 
-    _root_ide_package_.com.lloppy.candycrash.screens.levels.theme.GameTheme(darkTheme = darkTheme) {
+    GameTheme(darkTheme = darkTheme) {
         Surface {
             val navController: NavHostController = rememberNavController()
             NavHost(navController = navController, startDestination = HomeDestination) {
                 composable<HomeDestination> {
-                    _root_ide_package_.com.lloppy.candycrash.screens.levels.screens.home.HomeScreen(
+                    HomeScreen(
                         darkTheme = darkTheme,
                         onToggleTheme = { settings.toggleDarkTheme() },
                         onPlay = { navController.navigate(LevelsDestination) },
@@ -48,16 +53,14 @@ fun App() {
                     )
                 }
                 composable<SettingsDestination> {
-                    _root_ide_package_.com.lloppy.candycrash.screens.levels.screens.settings.SettingsScreen(
-                        onBack = { navController.popBackStack() })
+                    SettingsScreen(onBack = { navController.popBackStack() })
                 }
                 composable<GameDestination> { backStackEntry ->
                     val levelId = backStackEntry.toRoute<GameDestination>().levelId
-                    _root_ide_package_.com.lloppy.candycrash.screens.levels.screens.game.GameScreen(
+                    GameScreen(
                         levelId = levelId,
                         onBack = { navController.popBackStack() },
                         onNextLevel = { nextId ->
-                            // заменяем текущий игровой экран следующим уровнем
                             navController.navigate(GameDestination(nextId)) {
                                 popUpTo<GameDestination> { inclusive = true }
                             }

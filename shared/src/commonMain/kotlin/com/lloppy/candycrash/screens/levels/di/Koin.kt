@@ -8,9 +8,7 @@ import org.koin.core.module.dsl.factoryOf
 import org.koin.dsl.module
 
 val appModule = module {
-    // Постоянное хранилище (Android SharedPreferences / iOS NSUserDefaults)
     single<Settings> { Settings() }
-    // Репозитории живут на всё время приложения
     single { _root_ide_package_.com.lloppy.candycrash.screens.levels.game.GameProgressRepository(get()) }
     single { _root_ide_package_.com.lloppy.candycrash.screens.levels.game.SettingsRepository(get()) }
 }
@@ -18,7 +16,6 @@ val appModule = module {
 val viewModelModule = module {
     factoryOf(::LevelsViewModel)
     factoryOf(::SettingsViewModel)
-    // GameViewModel принимает levelId как параметр навигации
     factory { params ->
         _root_ide_package_.com.lloppy.candycrash.screens.levels.screens.game.GameViewModel(
             levelId = params.get(),

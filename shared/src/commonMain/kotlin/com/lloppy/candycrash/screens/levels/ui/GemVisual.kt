@@ -35,18 +35,10 @@ import org.jetbrains.compose.resources.painterResource
 
 private val rainbow = GemColor.entries.map { it.color }
 
-/** Размер картинки-наложения относительно шара (1.0 = во всю сферу). */
 private const val GEM_IMAGE_FRACTION = 0.90f
 
-/** Доля цветного оттенка поверх картинки (0f = без оттенка). */
 private const val GEM_TINT_ALPHA = 0.01f
 
-/**
- * Картинка-наложение поверх шара (своя для каждого цвета).
- * Сейчас это прозрачные плейсхолдеры — замените файлы
- * shared/src/commonMain/composeResources/drawable/gem_overlay_<цвет>.*
- * своими изображениями, и они появятся на шарах.
- */
 private fun overlayRes(color: GemColor): DrawableResource = when (color) {
     GemColor.Red -> Res.drawable.gem_overlay_red
     GemColor.Blue -> Res.drawable.gem_overlay_blue
@@ -57,11 +49,6 @@ private fun overlayRes(color: GemColor): DrawableResource = when (color) {
     GemColor.Cyan -> Res.drawable.gem_overlay_cyan
 }
 
-/**
- * Один шарик: всегда светящаяся "планета" (как в тёмной теме), поверх неё —
- * картинка-наложение по цвету (если задана). Цветная бомба — радужная;
- * спецэлементы помечаются белым.
- */
 @Composable
 fun GemVisual(
     gem: Gem,
@@ -69,11 +56,9 @@ fun GemVisual(
     selected: Boolean = false,
 ) {
     Box(modifier, contentAlignment = Alignment.Center) {
-        // основа — сфера
         Canvas(Modifier.fillMaxSize()) {
             if (gem.special == Special.COLOR_BOMB) drawColorBomb() else drawPlanet(gem.color.color)
         }
-        // наложение картинки по цвету (не для цветной бомбы), с лёгким оттенком цвета
         if (gem.special != Special.COLOR_BOMB) {
             Image(
                 painter = painterResource(overlayRes(gem.color)),
@@ -86,7 +71,6 @@ fun GemVisual(
                 modifier = Modifier.fillMaxSize(GEM_IMAGE_FRACTION).clip(CircleShape),
             )
         }
-        // спецэлементы и подсветка выбора — поверх
         Canvas(Modifier.fillMaxSize()) {
             val radius = size.minDimension / 2f
             val center = Offset(size.width / 2f, size.height / 2f)

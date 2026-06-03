@@ -32,13 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 
-/** Золотой акцент для звёзд (общий по всему приложению). */
 val Gold = Color(0xFFFFC107)
 
-/**
- * «Наклеечный» заголовок в стиле casual-игр: жирный текст с тёмной обводкой
- * и золотисто-кремовым градиентом. Хорошо читается на любом фоне (обе темы).
- */
 @Composable
 fun GameTitle(
     text: String,
@@ -51,13 +46,11 @@ fun GameTitle(
     val outlinePx = with(LocalDensity.current) { fontSize.toPx() } * 0.16f
     val base = TextStyle(fontSize = fontSize, fontWeight = FontWeight.ExtraBold)
     Box(modifier, contentAlignment = Alignment.Center) {
-        // мягкая тень
         Text(
             text = text,
             style = base.copy(color = Color.Black.copy(alpha = 0.25f)),
             modifier = Modifier.offset(y = 2.dp),
         )
-        // обводка
         Text(
             text = text,
             style = base.copy(
@@ -65,7 +58,6 @@ fun GameTitle(
                 drawStyle = Stroke(width = outlinePx, join = StrokeJoin.Round),
             ),
         )
-        // заливка-градиент
         Text(
             text = text,
             style = base.copy(brush = Brush.verticalGradient(listOf(fillTop, fillBottom))),
@@ -73,7 +65,6 @@ fun GameTitle(
     }
 }
 
-/** Фон приложения: космический градиент + звёзды в тёмной теме, конфетный — в светлой. */
 @Composable
 fun GameBackground(modifier: Modifier = Modifier) {
     val dark = _root_ide_package_.com.lloppy.candycrash.screens.levels.theme.LocalIsDarkTheme.current
@@ -93,7 +84,6 @@ fun GameBackground(modifier: Modifier = Modifier) {
     }
 }
 
-/** Круглая глянцевая кнопка. */
 @Composable
 fun RoundIconButton(
     onClick: () -> Unit,
@@ -117,7 +107,6 @@ fun RoundIconButton(
     ) { content() }
 }
 
-/** Глянцевая панель-карточка с градиентом и тенью. */
 @Composable
 fun GlossyCard(
     modifier: Modifier = Modifier,
@@ -139,7 +128,6 @@ fun GlossyCard(
     )
 }
 
-/** Диалог в едином стиле игры. */
 @Composable
 fun GameDialog(
     onDismiss: () -> Unit,

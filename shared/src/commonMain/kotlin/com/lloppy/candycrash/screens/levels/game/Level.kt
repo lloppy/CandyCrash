@@ -2,29 +2,18 @@ package com.lloppy.candycrash.screens.levels.game
 
 import kotlin.math.abs
 
-/**
- * Описание одного уровня сложности.
- *
- * @param mask форма поля: mask[r][c] == true — играбельная клетка,
- *        false — заблокированная (пустая, шарики туда не попадают).
- */
 data class Level(
     val id: Int,
     val rows: Int,
     val cols: Int,
     val colors: Int,
     val moves: Int,
-    /** Порог 1 звезды — нужен, чтобы пройти уровень. */
     val star1: Int,
-    /** Порог 2 звёзд. */
     val star2: Int,
-    /** Порог 3 звёзд. */
     val star3: Int,
     val mask: List<List<Boolean>>,
-    /** Цель уровня (по умолчанию — набрать очки). */
     val objective: Objective = Objective.Score,
 ) {
-    /** Счёт, необходимый для прохождения уровня. */
     val passScore: Int get() = star1
 
     fun playable(r: Int, c: Int): Boolean =
@@ -37,17 +26,13 @@ object Levels {
     const val COUNT = 10
     private const val N = 8
 
-    /** 10 уровней с растущей сложностью и разной формой поля. */
     val all: List<Level> = (1..COUNT).map { i ->
         val mask = shapeFor(i)
         val playable = mask.sumOf { row -> row.count { it } }
         val moves = (25 - (i - 1)).coerceAtLeast(12)
-        val colors = (4 + (i - 1) / 3).coerceAtMost(5) // максимум 5 цветов (5 картинок)
-        // пороги звёзд завязаны на число ходов и размер поля (ожидаемый счёт за ход).
-        // Играем до конца ходов, поэтому 3 звезды — сложно, но достижимо.
+        val colors = (4 + (i - 1) / 3).coerceAtMost(5)
         val pf = playable.toDouble() / (N * N)
         val objective = objectiveFor(i)
-        // защита от опечаток: цвет цели должен существовать на уровне
         if (objective is Objective.Collect) {
             check(objective.targets.keys.all { it.ordinal < colors }) {
                 "Level $i: цель использует цвет вне диапазона colors=$colors"
@@ -71,24 +56,21 @@ object Levels {
 
     private fun roundTo(value: Int, step: Int) = ((value + step / 2) / step) * step
 
-    /** Цель уровня: микс «набрать очки» и «собрать N шариков цвета». Счётчики
-     *  подобраны под число ходов уровня (легко тюнится). */
     private fun objectiveFor(level: Int): Objective = when (level) {
-        1 -> Objective.Collect(linkedMapOf(GemColor.Red to 14))                        // 4 цвета, 25 ходов
-        2 -> Objective.Collect(linkedMapOf(GemColor.Blue to 16))                       // 4 цвета, 24 хода
-        3 -> Objective.Collect(linkedMapOf(GemColor.Red to 20))                        // 4 цвета, 23 хода
-        4 -> Objective.Collect(linkedMapOf(GemColor.Green to 16, GemColor.Yellow to 16)) // 5 цветов, 22 хода
-        5 -> Objective.Collect(linkedMapOf(GemColor.Blue to 3)) // TEMP для теста салюта
-        6 -> Objective.Collect(linkedMapOf(GemColor.Purple to 18))                     // 5 цветов, 20 ходов
-        7 -> Objective.Collect(linkedMapOf(GemColor.Yellow to 22))                     // 6 цветов, 19 ходов
-        8 -> Objective.Collect(linkedMapOf(GemColor.Red to 16, GemColor.Purple to 16)) // 6 цветов, 18 ходов
-        9 -> Objective.Collect(linkedMapOf(GemColor.Yellow to 16, GemColor.Purple to 16)) // 6 цветов, 17 ходов
-        else -> Objective.Collect(linkedMapOf(GemColor.Green to 12, GemColor.Blue to 12, GemColor.Yellow to 12)) // 10: 16 ходов
+        1 -> Objective.Collect(linkedMapOf(GemColor.Red to 14))
+        2 -> Objective.Collect(linkedMapOf(GemColor.Blue to 16))
+        3 -> Objective.Collect(linkedMapOf(GemColor.Red to 20))
+        4 -> Objective.Collect(linkedMapOf(GemColor.Green to 16, GemColor.Yellow to 16))
+        5 -> Objective.Collect(linkedMapOf(GemColor.Blue to 16, GemColor.Green to 16))
+        6 -> Objective.Collect(linkedMapOf(GemColor.Purple to 18))
+        7 -> Objective.Collect(linkedMapOf(GemColor.Yellow to 22))
+        8 -> Objective.Collect(linkedMapOf(GemColor.Red to 16, GemColor.Purple to 16))
+        9 -> Objective.Collect(linkedMapOf(GemColor.Yellow to 16, GemColor.Purple to 16))
+        else -> Objective.Collect(linkedMapOf(GemColor.Green to 12, GemColor.Blue to 12, GemColor.Yellow to 12))
     }
 
-    /** Возвращает форму поля для уровня (предикат играбельности на сетке N×N). */
     private fun shapeFor(level: Int): List<List<Boolean>> {
-        val center = (N - 1) / 2.0 // 3.5
+        val center = (N - 1) / 2.0
 
         fun diamond(r: Int, c: Int, k: Int) =
             abs(r - center) + abs(c - center) <= k + 0.001
@@ -106,16 +88,16 @@ object Levels {
         fun plus(r: Int, c: Int, lo: Int, hi: Int) = (c in lo..hi) || (r in lo..hi)
 
         val pred: (Int, Int) -> Boolean = when (level) {
-            1 -> { _, _ -> true }                                  // квадрат
-            2 -> { r, c -> !corner(r, c, 2) }                      // октагон (срезанные углы)
-            3 -> { r, c -> diamond(r, c, 4) }                      // ромб
-            4 -> { r, c -> plus(r, c, 2, 5) }                      // крест
-            5 -> { r, c -> circle(r, c, 4.2) }                     // круг
-            6 -> { r, c -> diamond(r, c, 5) }                      // широкий ромб
-            7 -> { r, c -> circle(r, c, 3.6) }                     // круг поменьше
-            8 -> { r, c -> plus(r, c, 3, 4) }                      // тонкий крест
-            9 -> { r, c -> diamond(r, c, 3) }                      // маленький ромб
-            else -> { r, c -> diamond(r, c, 4) || plus(r, c, 2, 5) } // звезда
+            1 -> { _, _ -> true }
+            2 -> { r, c -> !corner(r, c, 2) }
+            3 -> { r, c -> diamond(r, c, 4) }
+            4 -> { r, c -> plus(r, c, 2, 5) }
+            5 -> { r, c -> circle(r, c, 4.2) }
+            6 -> { r, c -> diamond(r, c, 5) }
+            7 -> { r, c -> circle(r, c, 3.6) }
+            8 -> { r, c -> plus(r, c, 3, 4) }
+            9 -> { r, c -> diamond(r, c, 3) }
+            else -> { r, c -> diamond(r, c, 4) || plus(r, c, 2, 5) }
         }
         return List(N) { r -> List(N) { c -> pred(r, c) } }
     }

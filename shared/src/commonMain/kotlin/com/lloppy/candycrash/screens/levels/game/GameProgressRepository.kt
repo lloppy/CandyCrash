@@ -7,21 +7,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 
-/**
- * Хранит прогресс игрока: какие уровни открыты и сколько звёзд заработано.
- * Данные сохраняются между запусками через [Settings]
- * (Android SharedPreferences / iOS NSUserDefaults).
- */
 class GameProgressRepository(
     private val settings: Settings,
 ) {
 
     private val _highestUnlocked = MutableStateFlow(settings.getInt(KEY_UNLOCKED, 1))
-    /** Максимальный открытый уровень (1..Levels.COUNT). */
     val highestUnlocked: StateFlow<Int> = _highestUnlocked.asStateFlow()
 
     private val _stars = MutableStateFlow(loadStars())
-    /** Лучшее количество звёзд (0..3) по каждому пройденному уровню. */
     val stars: StateFlow<Map<Int, Int>> = _stars.asStateFlow()
 
     fun onLevelCompleted(levelId: Int, earnedStars: Int) {
@@ -37,7 +30,6 @@ class GameProgressRepository(
 
     fun isUnlocked(levelId: Int): Boolean = levelId <= _highestUnlocked.value
 
-    /** Полный сброс прогресса. */
     fun reset() {
         settings.remove(KEY_UNLOCKED)
         settings.remove(KEY_STARS)

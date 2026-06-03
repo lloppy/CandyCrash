@@ -17,14 +17,14 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import kotlin.random.Random
 
 private class Particle(
-    val x0: Float,   // старт по X (доля ширины)
-    val y0: Float,   // старт по Y (доля высоты)
-    val vx: Float,   // скорость X (доля ширины за всю анимацию)
-    val vy: Float,   // скорость Y (вверх отрицательная)
+    val x0: Float,
+    val y0: Float,
+    val vx: Float,
+    val vy: Float,
     val color: Color,
-    val w: Float,    // ширина бумажки (доля min-стороны)
+    val w: Float,
     val h: Float,
-    val spin: Float, // оборотов
+    val spin: Float,
 )
 
 private val confettiColors = listOf(
@@ -33,10 +33,6 @@ private val confettiColors = listOf(
     Color(0xFFFFFFFF),
 )
 
-/**
- * Победный «салют»: бумажки вылетают из нижних углов вверх и опадают.
- * Проигрывается один раз при входе в композицию (показывать при победе).
- */
 @Composable
 fun ConfettiOverlay(modifier: Modifier = Modifier, count: Int = 120) {
     val particles = remember {
@@ -61,7 +57,7 @@ fun ConfettiOverlay(modifier: Modifier = Modifier, count: Int = 120) {
     Canvas(modifier.fillMaxSize()) {
         val tt = t.value
         if (tt >= 1f) return@Canvas
-        val g = 1.8f // «гравитация»
+        val g = 1.8f
         particles.forEach { p ->
             val alpha = ((1f - tt) / 0.3f).coerceIn(0f, 1f)
             if (alpha <= 0.01f) return@forEach
