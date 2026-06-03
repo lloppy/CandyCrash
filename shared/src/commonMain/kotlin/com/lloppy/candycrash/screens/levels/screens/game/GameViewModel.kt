@@ -12,11 +12,14 @@ import com.lloppy.candycrash.screens.levels.game.Objective
 import com.lloppy.candycrash.screens.levels.game.Pos
 import com.lloppy.candycrash.screens.levels.game.SettingsRepository
 import com.lloppy.candycrash.screens.levels.game.isComplete
-import com.lloppy.candycrash.screens.levels.mvi.MviViewModel
-import com.lloppy.candycrash.screens.levels.mvi.NoEvent
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -24,7 +27,13 @@ class GameViewModel(
     val levelId: Int,
     private val progress: GameProgressRepository,
     private val settings: SettingsRepository,
-) : MviViewModel<GameState, GameAction, NoEvent>(GameState()) {
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(GameState())
+    val state: StateFlow<GameState> = _state.asStateFlow()
+
+    private val currentState: GameState get() = _state.value
+    private fun updateState(reducer: GameState.() -> GameState) = _state.update(reducer)
 
     private val level: Level = Levels.byId(levelId)
     private val random = Random.Default
@@ -37,7 +46,7 @@ class GameViewModel(
         startLevel()
     }
 
-    override fun onAction(action: GameAction) = when (action) {
+    fun onAction(action: GameAction) = when (action) {
         is GameAction.CellClicked -> onCellClicked(action.pos)
         is GameAction.Swiped -> applyMove(action.from, action.to)
         GameAction.Restart -> startLevel()
