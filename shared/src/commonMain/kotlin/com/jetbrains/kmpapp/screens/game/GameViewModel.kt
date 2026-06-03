@@ -19,6 +19,9 @@ import kotlin.random.Random
 
 enum class GameStatus { Playing, Won, Lost }
 
+/** Совпавший шарик, который сейчас «лопается» (анимация очистки). */
+data class ClearFx(val row: Int, val col: Int, val gem: Gem)
+
 data class GameUiState(
     /** Поле для отображения: null означает пустую клетку (во время анимации). */
     val board: List<List<Gem?>> = emptyList(),
@@ -30,6 +33,8 @@ data class GameUiState(
     val earnedStars: Int = 0,
     /** Идёт анимация хода — ввод заблокирован. */
     val busy: Boolean = false,
+    /** Шарики, которые сейчас лопаются (для анимации «поп»). */
+    val clearing: List<ClearFx> = emptyList(),
 )
 
 class GameViewModel(
@@ -88,29 +93,69 @@ class GameViewModel(
     }
 
     /**
-     * Выполняет обмен [a] <-> [b]. Без анимации: поле сразу переходит в итоговое
-     * состояние (совпадения убраны, падение и досыпка применены). Используется
-     * тапом и свайпом.
+     * Выполняет обмен [a] <-> [b]. Анимация: обмен → "поп" совпавших → падение,
+     * затем каскады. Недопустимый ход — отскок. Используется тапом и свайпом.
      */
     fun applyMove(a: Pos, b: Pos) {
         val state = _uiState.value
-        if (state.status != GameStatus.Playing) return
+        if (state.busy || state.status != GameStatus.Playing) return
         if (!Match3Engine.areAdjacent(a, b)) return
 
         val result = Match3Engine.tryMove(solidBoard, a, b, level, random)
-        if (result == null) {
-            // недопустимый ход — просто снимаем выбор
-            _uiState.update { it.copy(selected = null) }
-            return
+        val swappedBoard = Match3Engine.swapped(solidBoard, a, b)
+        // фиксируем обмен в поле СИНХРОННО — чтобы гашение смещения от пальца и
+        // анимация обмена стартовали одновременно, без рывка на отпускании.
+        _uiState.update { it.copy(board = swappedBoard, selected = null, busy = true) }
+        viewModelScope.launch {
+            delay(SWAP_MS)
+
+            if (result == null) {
+                // недопустимый ход — вернуть назад (отскок)
+                _uiState.update { it.copy(board = solidBoard) }
+                delay(SWAP_MS)
+                _uiState.update { it.copy(busy = false) }
+                return@launch
+            }
+            runCascade(result, swappedBoard)
+        }
+    }
+
+    private suspend fun runCascade(result: MoveResult, swappedBoard: List<List<Gem?>>) {
+        var prev = swappedBoard
+        val steps = result.frames.size / 2
+        for (k in 0 until steps) {
+            val cleared = result.frames[2 * k]      // дыры + созданные спецэлементы
+            val collapsed = result.frames[2 * k + 1] // после падения и досыпки
+
+            // что лопнуло: было в prev, стало пусто в cleared
+            val fx = buildList {
+                for (r in prev.indices) for (c in prev[r].indices) {
+                    val g = prev[r][c]
+                    if (g != null && cleared[r][c] == null) add(ClearFx(r, c, g))
+                }
+            }
+
+            // фаза "поп" — совпавшие сжимаются
+            _uiState.update { it.copy(board = cleared, clearing = fx) }
+            delay(POP_MS)
+
+            // фаза падения — уцелевшие съезжают, новые сыпятся сверху
+            val fallCells = maxFallCells(cleared, collapsed)
+            _uiState.update { it.copy(board = collapsed, clearing = emptyList()) }
+            delay(fallDelay(fallCells))
+
+            prev = collapsed
         }
 
         var board = result.finalBoard
-        if (!Match3Engine.hasAvailableMove(board)) board = reshuffle(board)
+        if (!Match3Engine.hasAvailableMove(board)) {
+            board = reshuffle(board)
+            _uiState.update { it.copy(board = board) }
+        }
         solidBoard = board
 
-        val newScore = state.score + result.gainedScore
-        val newMoves = state.movesLeft - 1
-        // уровень идёт до конца ходов; звёзды считаются по итоговому счёту
+        val newScore = _uiState.value.score + result.gainedScore
+        val newMoves = _uiState.value.movesLeft - 1
         val newStatus = when {
             newMoves > 0 -> GameStatus.Playing
             newScore >= level.star1 -> GameStatus.Won
@@ -125,11 +170,32 @@ class GameViewModel(
                 movesLeft = newMoves,
                 status = newStatus,
                 earnedStars = stars,
-                selected = null,
+                busy = false,
+                clearing = emptyList(),
             )
         }
         if (newStatus == GameStatus.Won) progress.onLevelCompleted(level.id, stars)
     }
+
+    /** Макс. расстояние падения (в клетках) между двумя кадрами. */
+    private fun maxFallCells(prev: List<List<Gem?>>, cur: List<List<Gem?>>): Int {
+        val prevRow = HashMap<Long, Int>()
+        for (r in prev.indices) for (c in prev[r].indices) prev[r][c]?.let { prevRow[it.id] = r }
+        var maxd = 0
+        for (c in 0 until level.cols) {
+            var newInCol = 0
+            for (r in 0 until level.rows) {
+                val g = cur[r][c] ?: continue
+                val pr = prevRow[g.id]
+                if (pr != null) { if (r - pr > maxd) maxd = r - pr } else newInCol++
+            }
+            if (newInCol > maxd) maxd = newInCol
+        }
+        return maxd
+    }
+
+    private fun fallDelay(cells: Int): Long =
+        (cells * MS_PER_CELL).coerceIn(MIN_MOVE_MS, MAX_MOVE_MS) + SETTLE_MS
 
     /** Перемешивает шарики (только играбельные клетки), пока не появится ход. */
     private fun reshuffle(board: List<List<Gem?>>): List<List<Gem?>> {
@@ -154,5 +220,15 @@ class GameViewModel(
         score >= level.star3 -> 3
         score >= level.star2 -> 2
         else -> 1
+    }
+
+    companion object {
+        // Тайминги синхронны с GameScreen (MS_PER_CELL/MIN/MAX совпадают).
+        private const val SWAP_MS = 110L
+        private const val POP_MS = 140L
+        private const val MS_PER_CELL = 55L
+        private const val MIN_MOVE_MS = 170L
+        private const val MAX_MOVE_MS = 480L
+        private const val SETTLE_MS = 40L
     }
 }

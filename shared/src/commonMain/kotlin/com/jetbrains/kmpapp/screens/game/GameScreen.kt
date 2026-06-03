@@ -77,11 +77,22 @@ import com.jetbrains.kmpapp.ui.RoundIconButton
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 private val Gold = Color(0xFFFFC107)
+
+// Падение с постоянной скоростью (мс/клетку), с порогами. Синхронно с GameViewModel.
+private const val MS_PER_CELL = 55
+private const val MIN_MOVE_MS = 170
+private const val MAX_MOVE_MS = 480
+private const val POP_MS = 140
+
+private fun moveDuration(distCells: Float): Int =
+    (distCells * MS_PER_CELL).roundToInt().coerceIn(MIN_MOVE_MS, MAX_MOVE_MS)
 
 @Composable
 fun GameScreen(
@@ -140,6 +151,7 @@ fun GameScreen(
                     board = state.board,
                     shape = viewModel.shape,
                     selected = state.selected,
+                    clearing = state.clearing,
                     enabled = !state.busy && state.status == GameStatus.Playing,
                     onCellTap = viewModel::onCellClick,
                     onSwipe = viewModel::applyMove,
@@ -351,11 +363,23 @@ private fun BoardFrame(content: @Composable () -> Unit) {
     }
 }
 
+/** Перетаскивание: шарик [aId] едет за пальцем, сосед [bId] — навстречу. */
+private data class DragState(
+    val aId: Long,
+    val bId: Long,
+    val a: Pos,
+    val b: Pos,
+    val horizontal: Boolean,
+    val sign: Int,
+    val vec: Offset,
+)
+
 @Composable
 private fun GameBoard(
     board: List<List<Gem?>>,
     shape: List<List<Boolean>>,
     selected: Pos?,
+    clearing: List<ClearFx>,
     enabled: Boolean,
     onCellTap: (Pos) -> Unit,
     onSwipe: (Pos, Pos) -> Unit,
@@ -376,6 +400,36 @@ private fun GameBoard(
         )
         fun playable(p: Pos) = shape.getOrNull(p.row)?.getOrNull(p.col) == true
 
+        // стартовые строки для НОВЫХ шариков — стопкой над полем (без наложений)
+        val prevIds = remember { mutableStateOf(emptySet<Long>()) }
+        val startRowById = remember(board) {
+            val map = HashMap<Long, Int>()
+            val prev = prevIds.value
+            for (c in 0 until cols) {
+                val newIds = ArrayList<Long>()
+                for (r in 0 until rows) {
+                    val g = board[r][c] ?: continue
+                    if (g.id !in prev) newIds.add(g.id)
+                }
+                val k = newIds.size
+                newIds.forEachIndexed { i, id -> map[id] = i - k }
+            }
+            map
+        }
+        LaunchedEffect(board) { prevIds.value = board.flatten().mapNotNull { it?.id }.toSet() }
+
+        val boardState = rememberUpdatedState(board)
+        var drag by remember { mutableStateOf<DragState?>(null) }
+        fun idAt(p: Pos) = boardState.value.getOrNull(p.row)?.getOrNull(p.col)?.id
+
+        // На отпускании просто фиксируем обмен (синхронно) и снимаем drag —
+        // каждый шарик сам плавно доедет до клетки из текущей позиции под пальцем.
+        fun finishDrag(commit: Boolean) {
+            val d = drag ?: return
+            if (commit) onSwipe(d.a, d.b)
+            drag = null
+        }
+
         val gestures = Modifier
             .pointerInput(rows, cols, cellPx, enabled) {
                 if (!enabled) return@pointerInput
@@ -384,60 +438,174 @@ private fun GameBoard(
             .pointerInput(rows, cols, cellPx, enabled) {
                 if (!enabled) return@pointerInput
                 var start: Pos? = null
-                var fired = false
                 var acc = Offset.Zero
                 detectDragGestures(
-                    onDragStart = { off -> start = toCell(off).takeIf { playable(it) }; fired = false; acc = Offset.Zero },
-                    onDragEnd = { start = null; fired = false },
-                    onDragCancel = { start = null; fired = false },
+                    onDragStart = { off -> start = toCell(off).takeIf { playable(it) }; acc = Offset.Zero },
+                    onDragEnd = {
+                        val d = drag
+                        val mag = if (d == null) 0f else if (d.horizontal) abs(d.vec.x) else abs(d.vec.y)
+                        finishDrag(commit = mag > cellPx / 2f)
+                        start = null
+                    },
+                    onDragCancel = { finishDrag(commit = false); start = null },
                 ) { change, dragAmount ->
                     change.consume()
-                    val s = start
-                    if (!fired && s != null) {
-                        acc += dragAmount
-                        if (acc.getDistance() > cellPx * 0.30f) {
-                            fired = true
-                            val (dr, dc) = if (abs(acc.x) > abs(acc.y)) {
-                                0 to (if (acc.x > 0) 1 else -1)
-                            } else {
-                                (if (acc.y > 0) 1 else -1) to 0
-                            }
-                            val target = Pos(s.row + dr, s.col + dc)
-                            if (target.row in 0 until rows && target.col in 0 until cols && playable(target)) {
-                                onSwipe(s, target)
+                    val s = start ?: return@detectDragGestures
+                    acc += dragAmount
+                    if (drag == null && acc.getDistance() > cellPx * 0.12f) {
+                        val horizontal = abs(acc.x) >= abs(acc.y)
+                        val sign = if (horizontal) (if (acc.x > 0) 1 else -1) else (if (acc.y > 0) 1 else -1)
+                        val target = if (horizontal) Pos(s.row, s.col + sign) else Pos(s.row + sign, s.col)
+                        if (target.row in 0 until rows && target.col in 0 until cols && playable(target)) {
+                            val aId = idAt(s)
+                            val bId = idAt(target)
+                            if (aId != null && bId != null) {
+                                drag = DragState(aId, bId, s, target, horizontal, sign, Offset.Zero)
                             }
                         }
+                    }
+                    val d = drag
+                    if (d != null && d.a == s) {
+                        val along = if (d.horizontal) acc.x else acc.y
+                        val mag = (along * d.sign).coerceIn(0f, cellPx)
+                        val vec = if (d.horizontal) Offset(d.sign * mag, 0f) else Offset(0f, d.sign * mag)
+                        drag = d.copy(vec = vec)
                     }
                 }
             }
 
-        Column(gestures) {
-            for (r in 0 until rows) {
-                Row {
-                    for (c in 0 until cols) {
-                        Box(Modifier.size(cell)) {
-                            if (shape.getOrNull(r)?.getOrNull(c) == true) {
-                                Box(
-                                    Modifier
-                                        .fillMaxSize()
-                                        .padding(2.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if ((r + c) % 2 == 0) tileA else tileB)
-                                )
-                            }
-                            val gem = board[r][c]
-                            if (gem != null) {
-                                GemVisual(
-                                    gem = gem,
-                                    selected = selected == Pos(r, c),
-                                    modifier = Modifier.fillMaxSize().padding(3.dp),
-                                )
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(cell * rows)
+                .then(gestures),
+        ) {
+            // подложка-плитки (форма поля)
+            Column {
+                for (r in 0 until rows) {
+                    Row {
+                        for (c in 0 until cols) {
+                            Box(Modifier.size(cell)) {
+                                if (shape.getOrNull(r)?.getOrNull(c) == true) {
+                                    Box(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .padding(2.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if ((r + c) % 2 == 0) tileA else tileB)
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+            // шарики: одна анимируемая позиция; при перетаскивании едут за пальцем
+            val d = drag
+            for (r in 0 until rows) {
+                for (c in 0 until cols) {
+                    val gem = board[r][c] ?: continue
+                    val dragging = d != null && (gem.id == d.aId || gem.id == d.bId)
+                    val dragVec = when {
+                        d != null && gem.id == d.aId -> d.vec
+                        d != null && gem.id == d.bId -> Offset(-d.vec.x, -d.vec.y)
+                        else -> Offset.Zero
+                    }
+                    key(gem.id) {
+                        AnimatedGem(
+                            gem = gem,
+                            row = r,
+                            col = c,
+                            startRow = startRowById[gem.id] ?: r,
+                            dragX = dragVec.x,
+                            dragY = dragVec.y,
+                            dragging = dragging,
+                            cell = cell,
+                            cellPx = cellPx,
+                            selected = selected == Pos(r, c),
+                        )
+                    }
+                }
+            }
+            // эффект "поп" — совпавшие шарики сжимаются
+            for (fx in clearing) {
+                key("fx", fx.gem.id) {
+                    ClearGem(fx = fx, cell = cell, cellPx = cellPx)
+                }
+            }
         }
+    }
+}
+
+/** Шарик, анимирующий позицию по id: новые падают сверху (со [startRow]), уцелевшие съезжают. */
+@Composable
+private fun AnimatedGem(
+    gem: Gem,
+    row: Int,
+    col: Int,
+    startRow: Int,
+    dragX: Float,
+    dragY: Float,
+    dragging: Boolean,
+    cell: Dp,
+    cellPx: Float,
+    selected: Boolean,
+) {
+    // единая позиция шарика в пикселях; init: новые — над полем (startRow), падают вниз
+    val animX = remember { Animatable(col * cellPx) }
+    val animY = remember { Animatable(startRow * cellPx) }
+    val targetX = col * cellPx + dragX
+    val targetY = row * cellPx + dragY
+    LaunchedEffect(targetX, targetY, dragging) {
+        if (dragging) {
+            // под палец — мгновенно
+            animX.snapTo(targetX)
+            animY.snapTo(targetY)
+        } else {
+            val dist = max(abs(targetX - animX.value), abs(targetY - animY.value)) / cellPx
+            if (dist < 0.01f) {
+                animX.snapTo(targetX)
+                animY.snapTo(targetY)
+            } else {
+                val dur = moveDuration(dist)
+                coroutineScope {
+                    launch { animX.animateTo(targetX, tween(dur)) }
+                    launch { animY.animateTo(targetY, tween(dur)) }
+                }
+            }
+        }
+    }
+    val selScale by animateFloatAsState(if (selected) 1.12f else 1f, label = "selScale")
+
+    Box(
+        Modifier
+            .offset { IntOffset(animX.value.roundToInt(), animY.value.roundToInt()) }
+            .size(cell)
+            .zIndex(if (dragging || selected) 1f else 0f),
+    ) {
+        GemVisual(
+            gem = gem,
+            selected = selected,
+            modifier = Modifier.fillMaxSize().padding(3.dp).scale(selScale),
+        )
+    }
+}
+
+/** Анимация исчезновения совпавшего шарика: быстро сжимается и гаснет. */
+@Composable
+private fun ClearGem(fx: ClearFx, cell: Dp, cellPx: Float) {
+    val scale = remember { Animatable(1f) }
+    LaunchedEffect(Unit) { scale.animateTo(0f, tween(POP_MS)) }
+    Box(
+        Modifier
+            .offset { IntOffset((fx.col * cellPx).roundToInt(), (fx.row * cellPx).roundToInt()) }
+            .size(cell)
+            .zIndex(2f),
+    ) {
+        GemVisual(
+            gem = fx.gem,
+            modifier = Modifier.fillMaxSize().padding(3.dp).scale(scale.value),
+        )
     }
 }
 
