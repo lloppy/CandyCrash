@@ -75,7 +75,6 @@ import com.lloppy.candycrash.screens.levels.game.GemColor
 import com.lloppy.candycrash.screens.levels.game.Levels
 import com.lloppy.candycrash.screens.levels.game.Objective
 import com.lloppy.candycrash.screens.levels.game.Pos
-import com.lloppy.candycrash.screens.levels.game.SettingsRepository
 import com.lloppy.candycrash.screens.levels.game.Special
 import com.lloppy.candycrash.screens.levels.theme.LocalIsDarkTheme
 import com.lloppy.candycrash.screens.levels.ui.ConfettiOverlay
@@ -85,7 +84,6 @@ import com.lloppy.candycrash.screens.levels.ui.GameTitle
 import com.lloppy.candycrash.screens.levels.ui.GemVisual
 import com.lloppy.candycrash.screens.levels.ui.GlossyCard
 import com.lloppy.candycrash.screens.levels.ui.RoundIconButton
-import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import kotlinx.coroutines.coroutineScope
@@ -116,9 +114,6 @@ fun GameScreen(
 ) {
     val viewModel = koinViewModel<GameViewModel> { parametersOf(levelId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
-
-    val settings = koinInject<SettingsRepository>()
-    val sound by settings.soundEnabled.collectAsStateWithLifecycle()
     var showPause by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
@@ -170,8 +165,8 @@ fun GameScreen(
                     clearing = state.clearing,
                     effects = state.effects,
                     enabled = !state.busy && state.status == GameStatus.Playing,
-                    onCellTap = { viewModel.onIntent(GameIntent.CellClicked(it)) },
-                    onSwipe = { from, to -> viewModel.onIntent(GameIntent.Swiped(from, to)) },
+                    onCellTap = { viewModel.onAction(GameAction.CellClicked(it)) },
+                    onSwipe = { from, to -> viewModel.onAction(GameAction.Swiped(from, to)) },
                 )
             }
         }
@@ -183,7 +178,7 @@ fun GameScreen(
             score = state.score,
             stars = state.earnedStars,
             hasNext = levelId < Levels.COUNT,
-            onRetry = { viewModel.onIntent(GameIntent.Restart) },
+            onRetry = { viewModel.onAction(GameAction.Restart) },
             onNext = { onNextLevel(levelId + 1) },
             onExit = onBack,
         )
@@ -191,10 +186,10 @@ fun GameScreen(
 
     if (showPause) {
         PauseDialog(
-            sound = sound,
-            onToggleSound = settings::setSoundEnabled,
+            sound = state.soundEnabled,
+            onToggleSound = { viewModel.onAction(GameAction.ToggleSound(it)) },
             onResume = { showPause = false },
-            onRestart = { showPause = false; viewModel.onIntent(GameIntent.Restart) },
+            onRestart = { showPause = false; viewModel.onAction(GameAction.Restart) },
             onExit = onBack,
         )
     }

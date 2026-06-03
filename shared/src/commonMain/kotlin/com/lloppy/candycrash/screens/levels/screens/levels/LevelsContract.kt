@@ -1,8 +1,8 @@
 package com.lloppy.candycrash.screens.levels.screens.levels
 
 import com.lloppy.candycrash.screens.levels.game.Level
-import com.lloppy.candycrash.screens.levels.mvi.UiEffect
-import com.lloppy.candycrash.screens.levels.mvi.UiIntent
+import com.lloppy.candycrash.screens.levels.mvi.UiAction
+import com.lloppy.candycrash.screens.levels.mvi.UiEvent
 import com.lloppy.candycrash.screens.levels.mvi.UiState
 
 data class LevelsState(
@@ -11,12 +11,12 @@ data class LevelsState(
     val infoLevel: Level? = null,
 ) : UiState
 
-sealed interface LevelsIntent : UiIntent {
-    data class NodeClicked(val level: Level) : LevelsIntent
-    data object DismissInfo : LevelsIntent
-    data class PlayClicked(val levelId: Int) : LevelsIntent
+sealed interface LevelsAction : UiAction {
+    data class NodeClicked(val level: Level) : LevelsAction
+    data object DismissInfo : LevelsAction
+    data class PlayClicked(val levelId: Int) : LevelsAction
 }
 
-sealed interface LevelsEffect : UiEffect {
-    data class NavigateToGame(val levelId: Int) : LevelsEffect
+sealed interface LevelsEvent : UiEvent {
+    data class NavigateToGame(val levelId: Int) : LevelsEvent
 }

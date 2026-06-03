@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.lloppy.candycrash.screens.levels.theme.LocalIsDarkTheme
+import com.lloppy.candycrash.screens.levels.theme.StarryBackground
 
 val Gold = Color(0xFFFFC107)
 
@@ -67,7 +69,7 @@ fun GameTitle(
 
 @Composable
 fun GameBackground(modifier: Modifier = Modifier) {
-    val dark = _root_ide_package_.com.lloppy.candycrash.screens.levels.theme.LocalIsDarkTheme.current
+    val dark = LocalIsDarkTheme.current
     Box(
         modifier
             .fillMaxSize()
@@ -78,7 +80,7 @@ fun GameBackground(modifier: Modifier = Modifier) {
                 )
             )
     ) {
-        if (dark) _root_ide_package_.com.lloppy.candycrash.screens.levels.theme.StarryBackground(
+        if (dark) StarryBackground(
             Modifier.fillMaxSize()
         )
     }
@@ -90,7 +92,7 @@ fun RoundIconButton(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val dark = _root_ide_package_.com.lloppy.candycrash.screens.levels.theme.LocalIsDarkTheme.current
+    val dark = LocalIsDarkTheme.current
     Box(
         modifier = modifier
             .size(46.dp)
@@ -113,7 +115,7 @@ fun GlossyCard(
     cornerRadius: Dp = 22.dp,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val dark = _root_ide_package_.com.lloppy.candycrash.screens.levels.theme.LocalIsDarkTheme.current
+    val dark = LocalIsDarkTheme.current
     Box(
         modifier = modifier
             .shadow(6.dp, RoundedCornerShape(cornerRadius))

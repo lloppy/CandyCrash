@@ -9,13 +9,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import com.lloppy.candycrash.screens.levels.game.SettingsRepository
 import com.lloppy.candycrash.screens.levels.screens.game.GameScreen
 import com.lloppy.candycrash.screens.levels.screens.home.HomeScreen
 import com.lloppy.candycrash.screens.levels.screens.settings.SettingsScreen
 import com.lloppy.candycrash.screens.levels.theme.GameTheme
 import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 
 @Serializable
 object HomeDestination
@@ -31,17 +30,17 @@ data class GameDestination(val levelId: Int)
 
 @Composable
 fun App() {
-    val settings = koinInject<SettingsRepository>()
-    val darkTheme by settings.darkTheme.collectAsStateWithLifecycle()
+    val viewModel = koinViewModel<AppViewModel>()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
-    GameTheme(darkTheme = darkTheme) {
+    GameTheme(darkTheme = state.darkTheme) {
         Surface {
             val navController: NavHostController = rememberNavController()
             NavHost(navController = navController, startDestination = HomeDestination) {
                 composable<HomeDestination> {
                     HomeScreen(
-                        darkTheme = darkTheme,
-                        onToggleTheme = { settings.toggleDarkTheme() },
+                        darkTheme = state.darkTheme,
+                        onToggleTheme = { viewModel.onAction(AppAction.ToggleTheme) },
                         onPlay = { navController.navigate(LevelsDestination) },
                         onSettings = { navController.navigate(SettingsDestination) },
                     )

@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.onEach
 
 class LevelsViewModel(
     progress: GameProgressRepository,
-) : MviViewModel<LevelsState, LevelsIntent, LevelsEffect>(LevelsState()) {
+) : MviViewModel<LevelsState, LevelsAction, LevelsEvent>(LevelsState()) {
 
     init {
         combine(progress.highestUnlocked, progress.stars) { highest, stars ->
@@ -19,12 +19,12 @@ class LevelsViewModel(
         }.launchIn(viewModelScope)
     }
 
-    override fun onIntent(intent: LevelsIntent) = when (intent) {
-        is LevelsIntent.NodeClicked -> updateState { copy(infoLevel = intent.level) }
-        LevelsIntent.DismissInfo -> updateState { copy(infoLevel = null) }
-        is LevelsIntent.PlayClicked -> {
+    override fun onAction(action: LevelsAction) = when (action) {
+        is LevelsAction.NodeClicked -> updateState { copy(infoLevel = action.level) }
+        LevelsAction.DismissInfo -> updateState { copy(infoLevel = null) }
+        is LevelsAction.PlayClicked -> {
             updateState { copy(infoLevel = null) }
-            emitEffect(LevelsEffect.NavigateToGame(intent.levelId))
+            emitEvent(LevelsEvent.NavigateToGame(action.levelId))
         }
     }
 }

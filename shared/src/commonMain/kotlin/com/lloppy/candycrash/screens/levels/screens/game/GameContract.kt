@@ -5,7 +5,7 @@ import com.lloppy.candycrash.screens.levels.game.Gem
 import com.lloppy.candycrash.screens.levels.game.GemColor
 import com.lloppy.candycrash.screens.levels.game.Objective
 import com.lloppy.candycrash.screens.levels.game.Pos
-import com.lloppy.candycrash.screens.levels.mvi.UiIntent
+import com.lloppy.candycrash.screens.levels.mvi.UiAction
 import com.lloppy.candycrash.screens.levels.mvi.UiState
 
 enum class GameStatus { Playing, Won, Lost }
@@ -29,10 +29,12 @@ data class GameState(
     val effects: List<ActivationFx> = emptyList(),
     val objective: Objective = Objective.Score,
     val collected: Map<GemColor, Int> = emptyMap(),
+    val soundEnabled: Boolean = true,
 ) : UiState
 
-sealed interface GameIntent : UiIntent {
-    data class CellClicked(val pos: Pos) : GameIntent
-    data class Swiped(val from: Pos, val to: Pos) : GameIntent
-    data object Restart : GameIntent
+sealed interface GameAction : UiAction {
+    data class CellClicked(val pos: Pos) : GameAction
+    data class Swiped(val from: Pos, val to: Pos) : GameAction
+    data object Restart : GameAction
+    data class ToggleSound(val enabled: Boolean) : GameAction
 }

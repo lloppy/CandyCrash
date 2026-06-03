@@ -50,13 +50,13 @@ fun SettingsScreen(
             SettingRow(
                 title = "Звук",
                 checked = state.soundEnabled,
-                onCheckedChange = { viewModel.onIntent(SettingsIntent.SetSound(it)) },
+                onCheckedChange = { viewModel.onAction(SettingsAction.SetSound(it)) },
             )
             HorizontalDivider()
             SettingRow(
                 title = "Вибрация",
                 checked = state.vibrationEnabled,
-                onCheckedChange = { viewModel.onIntent(SettingsIntent.SetVibration(it)) },
+                onCheckedChange = { viewModel.onAction(SettingsAction.SetVibration(it)) },
             )
         }
     }

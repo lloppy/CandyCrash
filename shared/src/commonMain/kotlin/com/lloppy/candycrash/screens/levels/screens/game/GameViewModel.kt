@@ -10,30 +10,38 @@ import com.lloppy.candycrash.screens.levels.game.Match3Engine
 import com.lloppy.candycrash.screens.levels.game.MoveResult
 import com.lloppy.candycrash.screens.levels.game.Objective
 import com.lloppy.candycrash.screens.levels.game.Pos
+import com.lloppy.candycrash.screens.levels.game.SettingsRepository
 import com.lloppy.candycrash.screens.levels.game.isComplete
 import com.lloppy.candycrash.screens.levels.mvi.MviViewModel
-import com.lloppy.candycrash.screens.levels.mvi.NoEffect
+import com.lloppy.candycrash.screens.levels.mvi.NoEvent
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 class GameViewModel(
     val levelId: Int,
     private val progress: GameProgressRepository,
-) : MviViewModel<GameState, GameIntent, NoEffect>(GameState()) {
+    private val settings: SettingsRepository,
+) : MviViewModel<GameState, GameAction, NoEvent>(GameState()) {
 
     private val level: Level = Levels.byId(levelId)
     private val random = Random.Default
     private var solidBoard: List<List<Gem?>> = emptyList()
 
     init {
+        settings.soundEnabled
+            .onEach { enabled -> updateState { copy(soundEnabled = enabled) } }
+            .launchIn(viewModelScope)
         startLevel()
     }
 
-    override fun onIntent(intent: GameIntent) = when (intent) {
-        is GameIntent.CellClicked -> onCellClicked(intent.pos)
-        is GameIntent.Swiped -> applyMove(intent.from, intent.to)
-        GameIntent.Restart -> startLevel()
+    override fun onAction(action: GameAction) = when (action) {
+        is GameAction.CellClicked -> onCellClicked(action.pos)
+        is GameAction.Swiped -> applyMove(action.from, action.to)
+        GameAction.Restart -> startLevel()
+        is GameAction.ToggleSound -> settings.setSoundEnabled(action.enabled)
     }
 
     private fun startLevel() {
@@ -52,6 +60,7 @@ class GameViewModel(
                 star2 = level.star2,
                 star3 = level.star3,
                 objective = level.objective,
+                soundEnabled = settings.soundEnabled.value,
             )
         }
     }

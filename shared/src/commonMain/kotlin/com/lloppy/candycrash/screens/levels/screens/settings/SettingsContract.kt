@@ -1,6 +1,6 @@
 package com.lloppy.candycrash.screens.levels.screens.settings
 
-import com.lloppy.candycrash.screens.levels.mvi.UiIntent
+import com.lloppy.candycrash.screens.levels.mvi.UiAction
 import com.lloppy.candycrash.screens.levels.mvi.UiState
 
 data class SettingsState(
@@ -8,7 +8,7 @@ data class SettingsState(
     val vibrationEnabled: Boolean = true,
 ) : UiState
 
-sealed interface SettingsIntent : UiIntent {
-    data class SetSound(val enabled: Boolean) : SettingsIntent
-    data class SetVibration(val enabled: Boolean) : SettingsIntent
+sealed interface SettingsAction : UiAction {
+    data class SetSound(val enabled: Boolean) : SettingsAction
+    data class SetVibration(val enabled: Boolean) : SettingsAction
 }

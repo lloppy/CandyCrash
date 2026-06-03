@@ -60,8 +60,8 @@ import com.lloppy.candycrash.screens.levels.game.Gem
 import com.lloppy.candycrash.screens.levels.game.Level
 import com.lloppy.candycrash.screens.levels.game.Levels
 import com.lloppy.candycrash.screens.levels.game.Objective
-import com.lloppy.candycrash.screens.levels.screens.levels.LevelsEffect
-import com.lloppy.candycrash.screens.levels.screens.levels.LevelsIntent
+import com.lloppy.candycrash.screens.levels.screens.levels.LevelsAction
+import com.lloppy.candycrash.screens.levels.screens.levels.LevelsEvent
 import com.lloppy.candycrash.screens.levels.screens.levels.LevelsViewModel
 import com.lloppy.candycrash.screens.levels.ui.GameBackground
 import com.lloppy.candycrash.screens.levels.ui.GameDialog
@@ -90,9 +90,9 @@ fun LevelsScreen(
     val density = LocalDensity.current
 
     LaunchedEffect(Unit) {
-        viewModel.effects.collect { effect ->
-            when (effect) {
-                is LevelsEffect.NavigateToGame -> onLevelClick(effect.levelId)
+        viewModel.events.collect { event ->
+            when (event) {
+                is LevelsEvent.NavigateToGame -> onLevelClick(event.levelId)
             }
         }
     }
@@ -131,7 +131,7 @@ fun LevelsScreen(
                 LevelMap(
                     highestUnlocked = state.highestUnlocked,
                     starsByLevel = state.stars,
-                    onNodeClick = { lvl -> viewModel.onIntent(LevelsIntent.NodeClicked(lvl)) },
+                    onNodeClick = { lvl -> viewModel.onAction(LevelsAction.NodeClicked(lvl)) },
                 )
             }
         }
@@ -141,8 +141,8 @@ fun LevelsScreen(
         LevelInfoDialog(
             level = lvl,
             bestStars = state.stars[lvl.id] ?: 0,
-            onPlay = { viewModel.onIntent(LevelsIntent.PlayClicked(lvl.id)) },
-            onDismiss = { viewModel.onIntent(LevelsIntent.DismissInfo) },
+            onPlay = { viewModel.onAction(LevelsAction.PlayClicked(lvl.id)) },
+            onDismiss = { viewModel.onAction(LevelsAction.DismissInfo) },
         )
     }
 }
